@@ -55,6 +55,10 @@
 "Something went wrong while trying to get your address trough your zip code and house number. Please fill in your street and city manually.", "Er is iets fout gegaan met het ophalen van het adres via postcode en huisnummer. Vul het adres handmatig in."
 "Street name is being retrieved", "Street name is being retrieved"
 "City name is being retrieved", "City name is being retrieved"
+"No addition is known for this housenumber.", "No addition is known for this housenumber."
+"Housenumber addition unknown.", "Housenumber addition unknown."
+"Known addition:", "Known addition:"
+"Known additions:", "Known additions:"
 
 "hsapi.index.couponTip", "Do you have a coupon code?<br />You can add your code on the<br />'payment' step."
 

@@ -373,7 +373,10 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
         if($product->getTypeId() == 'configurable') {
             $conf = Mage::getModel('catalog/product_type_configurable')->setProduct($product);
-            $simple_collection = $conf->getUsedProductCollection()->addFilterByRequiredOptions();
+            $simple_collection = $conf->getUsedProductCollection()
+                                      ->addFilterByRequiredOptions()
+                                      ->addAttributeToFilter('status', 1); // Only return products that are active
+
             $products = $simple_collection;
         } else if($product->getTypeId() == 'simple'){
             $products[] = $product;
@@ -649,7 +652,12 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
                     if(!$child_product_attributes)
                         $child_product_attributes = "entity_id,created_at,description,special_price,updated_at,image,sku,short_description,price,manufacturer";
 
-                    $simpleProductRepresentation = $this->_getProductAttributes(Mage::getModel('catalog/product')->load($simple_product->getId()), $child_product_attributes);
+                    $resProduct = Mage::getModel('catalog/product')->load($simple_product->getId());
+                    if ($resProduct->getData('status') == false) {
+                        continue;
+                    }
+
+                    $simpleProductRepresentation = $this->_getProductAttributes($resProduct, $child_product_attributes);
                     $configuration = array();
 
 

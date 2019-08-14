@@ -55,6 +55,10 @@
 "Something went wrong while trying to get your address trough your zip code and house number. Please fill in your street and city manually.", "Er is iets fout gegaan met het ophalen van het adres via postcode en huisnummer. Vul het adres handmatig in."
 "Street name is being retrieved", "Straatnaam wordt opgehaald"
 "City name is being retrieved", "Plaatsnaam wordt opgehaald"
+"No addition is known for this housenumber.", "Geen toevoeging bekend voor dit huisnummer."
+"Housenumber addition unknown.", "Huisnummer toevoeging onbekend."
+"Known addition:", "Bekende toevoeging:"
+"Known additions:", "Bekende toevoegingen:"
 
 "hsapi.index.couponTip", "Heb je een tegoedbon?<br />Die kun je straks in de stap<br />'betaalwijze' invoeren."
 
