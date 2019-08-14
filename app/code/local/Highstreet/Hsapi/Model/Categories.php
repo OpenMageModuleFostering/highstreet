@@ -32,6 +32,7 @@ class Highstreet_Hsapi_Model_Categories extends Mage_Core_Model_Abstract
             $category = array();
             $category['id'] = $categoryId;
             $category['title'] = $categoryObject->getData('name');
+            $category['include_in_menu'] = (bool)$categoryObject->getData('include_in_menu');
 
             if ($categoryObject->getImage()) {
                 $imageUrl = self::CATEGORY_MEDIA_PATH . $categoryObject->getImage();
@@ -45,29 +46,20 @@ class Highstreet_Hsapi_Model_Categories extends Mage_Core_Model_Abstract
             // category children
             $children = $this->getChildrenCollectionForCategoryId($categoryId);
 
-            $config = Mage::helper('highstreet_hsapi/config');
-            $filtersCategories = $config->filtersCategories();
-
             if ($children->count() > 0) {
                 $category['children'] = array();
                 
                 foreach ($children as $child) {
-                    if ($filtersCategories) {
-                        if ($child->getData('level') == 2 && // Top Category Level
-                            $child->getData('include_in_menu') == 0) {
-                            continue;
-                        }
-                    }
-
                     if ($child->getImage()) {
                         $childImageUrl = self::CATEGORY_MEDIA_PATH . $child->getImage();
                     } else {
                         $childImageUrl = '';
                     }
                     array_push($category['children'], array(
-                        'id'            => $child->getData('entity_id'),
-                        'title'         => $child->getData('name'),
-                        'image'         => $childImageUrl,
+                        'id'             => $child->getData('entity_id'),
+                        'title'          => $child->getData('name'),
+                        'image'          => $childImageUrl,
+                        'include_in_menu'=> (bool)$child->getData('include_in_menu')
                     ));
                 }
             }
@@ -113,21 +105,14 @@ class Highstreet_Hsapi_Model_Categories extends Mage_Core_Model_Abstract
             }
             $category['image'] = $imageUrl;
 
-            $category['product_count'] = $productCollection->count();
+            $category['include_in_menu'] = (bool)$categoryObject->getData('include_in_menu');
 
-            $config = Mage::helper('highstreet_hsapi/config');
-            $filtersCategories = $config->filtersCategories();
+            $category['product_count'] = $productCollection->count();
 
             // category children
             $category['children'] = array();
             if ($children->count() > 0) {
                 foreach ($children as $child) {
-                    if ($filtersCategories) {
-                        if ($child->getData('level') == 2 && // Top Category Level
-                            $child->getData('include_in_menu') == 0) {
-                            continue;
-                        }
-                    }
                     
                     $childRepresentation = $this->getCategoryTree($child->getData('entity_id'));
 

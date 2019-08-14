@@ -105,11 +105,23 @@ class Highstreet_Hsapi_Model_Checkout extends Mage_Core_Model_Abstract
             
         $response["quote"] = array_values($this->getProductsInQuote($quote,$products));
 
-        $this->addAddressToQuoteIfNeeded($quote);
         //Shipping carries
         $response['selected_shipping_method'] = $this->getSelectedShippingMethod($quote);
-        $response['shipping'] = array_values($this->getShippingMethods($quote, $response['selected_shipping_method']));
+
+        $config = Mage::helper('highstreet_hsapi/config_api');
+
+        //Some stores don't want to return the shipping methods in the cart (that is: when the selected_shipping_method is not set yet) 
+        //e.g. PME doesn't want this for performance optimization, everytime the cart is openend the magento backend will connect to Paazl, which is quite expensive. 
+        //Therefore they one return shipping info once the user acutally a has selected a shipping method.
+        //For PME we also know that shipping is always free, so the rewriter add  'price: 0' to the response.
+        if ($config->shippingInCartDisabled() && $response['selected_shipping_method'] === null) {
+            $response['shipping'] = array();
+        } else {
+            $response['shipping'] = array_values($this->getShippingMethods($quote, $response['selected_shipping_method']));
+        }
+
         $response["totals"] = $this->getQuoteTotals($quote);
+
 
  
         return $response;
@@ -125,12 +137,9 @@ class Highstreet_Hsapi_Model_Checkout extends Mage_Core_Model_Abstract
          $responseQuote = array();
         
 
-
-        $quoteItems = array();
-        foreach($quote->getAllItems() as $quoteItem) {
-            $quoteItems[$quoteItem->getId()] = $quoteItem;
-        }
-
+        $quoteItemsAlreadyAdded = array();
+        $quoteItems = $quote->getAllItems();
+        
 
 
         //loop through the requested products
@@ -234,8 +243,9 @@ class Highstreet_Hsapi_Model_Checkout extends Mage_Core_Model_Abstract
                     }
                     
 
-                    if($quoteItem)
-                        unset($quoteItems[$quoteItem->getId()]);
+                    if($quoteItem) {
+                        $quoteItemsAlreadyAdded[] = $quoteItem->getProduct()->getId();
+                    }
 
 
 
@@ -255,13 +265,23 @@ class Highstreet_Hsapi_Model_Checkout extends Mage_Core_Model_Abstract
 
 
         }
+
+        //explicit save for PME plugin and refetch quoteitems. For Amasty Free product plugin
+        $quote->collectTotals()->save(); 
+        $quoteItems = $quote->getAllItems();
+        
         
         foreach($quoteItems as $quoteItem) {
+            if(in_array($quoteItem->getProduct()->getId(),$quoteItemsAlreadyAdded))
+                continue;
+
             if(count($quoteItem->getChildren()) > 0)
                  continue;
 
             $productInQuote = $this->getProductInQuoteResponse($quoteItem);
             $responseQuote[] = $productInQuote;                        
+
+            $quoteItemsAlreadyAdded[] = $quoteItem->getProduct()->getId();
         }
 
 
@@ -286,6 +306,11 @@ class Highstreet_Hsapi_Model_Checkout extends Mage_Core_Model_Abstract
         $quantity = $quoteItem ? $quoteItem->getQty() : 0;
 
         $productInQuote["finalPrice"] = $quantity > 0 ? $product->getFinalPrice($quantity) : $product->getFinalPrice();
+
+        //The custom price is set by the Amasty - Auto Add Promo Items  extension. The extra free product has a custom price, and if it is set we should use that price.
+        //This price is already used (automatically) in the total calculations
+        if($quoteItem->getCustomPrice() !== null)
+            $productInQuote["finalPrice"] = $quoteItem->getCustomPrice();
         $productInQuote["quantity"] = $quantity;
         
         return $productInQuote;
@@ -328,21 +353,8 @@ class Highstreet_Hsapi_Model_Checkout extends Mage_Core_Model_Abstract
         return $responseTotals;
     }
 
-    private function addAddressToQuoteIfNeeded(&$quote) {
-        $address = $quote->getShippingAddress();
-
-        if(!$address->getCountryId()) {
-            $address->setCity("Utrecht") 
-                    ->setCountryId("NL") 
-                    ->setPostcode("3512NT") 
-                    ->setCollectShippingRates(true); 
-            $quote->setShippingAddress($address);
-        }
-    }
-
     private function getSelectedShippingMethod($quote) {
         $quoteShippingAddress = $quote->getShippingAddress();
-        $quoteShippingAddress->collectTotals(); //to make sure all available shipping methods are listed
 
         $quoteShippingAddress->collectShippingRates()->save(); //collect the rates
 
@@ -359,7 +371,7 @@ class Highstreet_Hsapi_Model_Checkout extends Mage_Core_Model_Abstract
         $responseCarriers = array();
         
         $quoteShippingAddress = $quote->getShippingAddress();
-        $quoteShippingAddress->collectTotals(); //to make sure all available shipping methods are listed
+        
 
         $quoteShippingAddress->collectShippingRates()->save(); //collect the rates
         $groupedRates = $quoteShippingAddress->getGroupedAllShippingRates();
@@ -402,19 +414,28 @@ class Highstreet_Hsapi_Model_Checkout extends Mage_Core_Model_Abstract
         return $product;
                 
     } 
-
+ 
     private function _getParentProduct($product) {
-        $config = Mage::helper('highstreet_hsapi/config');
+        $config = Mage::helper('highstreet_hsapi/config_api');
         if ($config->alwaysAddSimpleProductsToCart()) {
             return null;
         }
         
         $parentIds = Mage::getModel('catalog/product_type_configurable')->getParentIdsByChild($product->getId());
-        $parent = null;
-        if(isset($parentIds[0])){
-            $parent = Mage::getModel('catalog/product')->load($parentIds[0]);
+
+        foreach ($parentIds as $value) {
+            $product = Mage::getModel('catalog/product')->load($value);
+            
+            // Same check as in Products.php:656 
+            // Checks if a parent product is enabled
+            if ($product && $product->getId() !== null && 
+                ($product->getData('status') == Mage_Catalog_Model_Product_Status::STATUS_ENABLED || $product->getStatus() == Mage_Catalog_Model_Product_Status::STATUS_ENABLED ||
+                 $product->getData('status') == "Ingeschakeld" || $product->getStatus() == "Ingeschakeld")) {
+                return $product;
+            }
         }
-        return $parent;
+
+        return null;
     }
 
     private function _getConfiguration($product,$parent) {

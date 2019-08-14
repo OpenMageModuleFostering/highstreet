@@ -11,6 +11,7 @@ class Highstreet_Hsapi_Helper_Data extends Mage_Core_Helper_Abstract
 {
     /**
      * Return single request param. This returns the key as we have rest url
+     * Ignores params with three underscores in them
      * @param $params
      *
      * @return bool|int|string
@@ -18,8 +19,13 @@ class Highstreet_Hsapi_Helper_Data extends Mage_Core_Helper_Abstract
     public function extractRequestParam($params)
     {
         if($this->requestHasParams($params)){
-            foreach($params as $key => $value){
-                return $key;
+            foreach ($params as $key => $value) {
+                // Magento internal parameters use underscores to differentiate themselves
+                // if we want to pass a specific storefront we need to send the parameter '___store'
+                // this messes with the attributes call, so ignore these params
+                if (strstr($key, "___") === false) { 
+                    return $key;
+                }
             }
         }
         return false;

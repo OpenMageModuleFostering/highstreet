@@ -1,0 +1,28 @@
+<?php
+
+$configHelper = Mage::helper('highstreet_hsapi/config_api');
+
+if ($configHelper->nativeSmartbannerAppUrl() != "") {
+	$deeplink = $configHelper->nativeSmartbannerAppUrl() . "://";
+
+	$category = Mage::registry('current_category');
+	$deeplink .= $category ? "categories/" . $category->getId() . "/" : "";
+
+	$product = Mage::registry('current_product');
+	$deeplink .= $product ? "products/" . $product->getId() . "/" : "";
+
+	$searchQuery = Mage::app()->getRequest()->getParam('q');
+	$deeplink .= $searchQuery ? "search/" . $searchQuery . "/" : "";
+
+	if ($configHelper->shouldShowNativeSmartbanner()) {
+		$metaTag = '<meta name="apple-itunes-app" content="app-id=' . $configHelper->nativeSmartbannerAppId();
+		$metaTag .= ', app-argument=' . $deeplink;
+		$metaTag .= '"/>';
+
+		echo $metaTag;
+	}
+
+	echo '<meta property="al:ios:app_name" content="' . $configHelper->nativeSmartbannerAppName() . '">';
+	echo '<meta property="al:ios:app_store_id" content="' . $configHelper->nativeSmartbannerAppId() . '">';
+	echo '<meta property="al:ios:url" content="' . $deeplink . '">';
+}

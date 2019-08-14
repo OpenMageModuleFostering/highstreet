@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+
+<layout version="1.2.0">
+    <default>
+    	<reference name="head">
+    		<block type="core/template" name="native_smart_app_banner" template="highstreet/native_smart_app_banner.phtml" />
+    	</reference>
+        <reference name="before_body_end">
+            <block type="page/html_header" name="smart_app_banner" template="highstreet/smart_app_banner.phtml" />
+        </reference>
+    </default>
+</layout>

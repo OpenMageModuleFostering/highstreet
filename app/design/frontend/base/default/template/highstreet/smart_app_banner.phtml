@@ -1,0 +1,91 @@
+<?php
+/**
+ * Template for smart-app-banner
+ */
+
+$website = Mage::app()->getWebsite()->getCode();
+
+$configHelper = Mage::helper('highstreet_hsapi/config_api');
+
+$id = $configHelper->storeIdentifier();
+
+if ($id == "") { // No id set == no smartbanner
+    return;
+}
+
+// Request config
+$config = new stdClass();
+
+$config->store = Mage::app()->getStore()->getCode();
+$config->host = $_SERVER['HTTP_HOST'];
+
+$request = $this->getRequest();
+$config->module = $request ? strtolower($request->getModuleName()) : '';
+$config->controller = $request ? strtolower($request->getControllerName()) : '';
+
+$config->locale = Mage::app()->getLocale()->getLocaleCode();
+
+
+
+// Content config
+$content = new stdClass();
+
+$category = Mage::registry('current_category');
+$content->category = $category ? $category->getId() : null;
+
+$product = Mage::registry('current_product');
+$content->product = $product ? $product->getId() : null;
+
+$content->query = Mage::app()->getRequest()->getParam('q', null);
+
+$content->version = Mage::getConfig()->getModuleConfig('Highstreet_SmartAppBanner')->version;
+
+
+// Don't show on checkout
+$module_blacklist = array( 'checkout', 'onestepcheckout', 'hsapi' );
+$controller_blacklist = array( 'checkout_cart' );
+
+if ( in_array($config->module, $module_blacklist) 
+    || in_array($config->controller, $controller_blacklist) ) {
+
+    return;
+
+}
+
+// Construct javascript url
+$configHelper = Mage::helper('highstreet_hsapi/config_api');
+$middleWareUrl = $configHelper->middlewareUrl();
+$base_url = $middleWareUrl . "/smartbanner";
+$key = md5('dY63*23xOi'. $configHelper->storeIdentifier());
+$params = base64_url_encode(encrypt(json_encode($config), $key));
+
+$js_url = "${base_url}/${params}";
+
+/**
+ * Returns an encrypted & utf8-encoded string
+ */
+function encrypt($pure_string, $encryption_key) {
+    $iv_size = mcrypt_get_iv_size(MCRYPT_BLOWFISH, MCRYPT_MODE_ECB);
+    $iv = mcrypt_create_iv($iv_size, MCRYPT_RAND);
+    $encrypted_string = mcrypt_encrypt(MCRYPT_BLOWFISH, $encryption_key, utf8_encode($pure_string), MCRYPT_MODE_ECB, $iv);
+    return trim($encrypted_string);
+}
+
+/**
+ * Returns base64 url-safe encoded string
+ */
+function base64_url_encode($input) {
+    return strtr(base64_encode($input), '+/=', '-_~');
+}
+
+
+?>
+
+<script type="text/javascript">
+//<![CDATA[
+var smartAppBannerContent = <?php echo json_encode($content); ?>;
+//]]>
+</script>
+
+<script src="<?php echo $js_url; ?>" defer="true" ></script>
+

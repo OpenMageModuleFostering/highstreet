@@ -3,7 +3,7 @@
     "type": "magento-module",
     "license": "-",
     "homepage": "",
-    "description": "Highstreet Magento Extension. This extension allows the Highstreet iPad app to connect to the store. ",
+    "description": "Highstreet Magento Extension. This extension allows the Highstreet iPad and iPhone apps to connect to the store. ",
     "authors": [
     {
         "name": "Christian Apers",

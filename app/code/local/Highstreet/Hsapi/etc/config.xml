@@ -11,7 +11,7 @@
 <config>
     <modules>
         <Highstreet_Hsapi>
-            <version>1.0.0</version>
+            <version>1.4.3</version>
         </Highstreet_Hsapi>
     </modules>
     <frontend>
@@ -33,13 +33,7 @@
                 </Highstreet_Hsapi> 
             </modules> 
         </translate>
-        <layout>
-            <updates>
-                <hsapi>
-                    <file>highstreet/checkout.xml</file>
-                </hsapi>
-            </updates>
-        </layout>
+        
     </frontend>
     <global>
         <models>
@@ -64,8 +58,8 @@
                 </setup>
             </highstreet_hsapi_setup>
         </resources>
-        <events>
-            <sales_quote_merge_before>
+        <events> 
+           <sales_quote_merge_before>
                 <observers>
                     <highstreet_hsapi_merge_quote>
                         <type>singleton</type>
@@ -73,7 +67,44 @@
                         <method>mergeQuote</method>
                     </highstreet_hsapi_merge_quote>
                 </observers>
-            </sales_quote_merge_before>
-        </events>
+           </sales_quote_merge_before>           
+	       <sales_order_invoice_pay>
+                <observers>
+                    <highstreet_hsapi_sales_order_invoice_pay>
+                        <class>Highstreet_Hsapi_Model_Observer</class>
+                        <method>salesOrderInvoicePay</method>
+                    </highstreet_hsapi_sales_order_invoice_pay>
+                </observers>
+            </sales_order_invoice_pay>
+            <sales_order_invoice_cancel>
+                <observers>
+                    <highstreet_hsapi_sales_order_invoice_cancel>
+                    	<class>Highstreet_Hsapi_Model_Observer</class>
+                    	<method>salesOrderInvoiceCancel</method>
+                    </highstreet_hsapi_sales_order_invoice_cancel>
+                </observers>
+            </sales_order_invoice_cancel>
+    	</events>
     </global>
+    <adminhtml>
+        <acl>
+            <resources>
+                <admin>
+                    <children>
+                        <system>
+                            <children>
+                                <config>
+                                    <children>
+                                        <highstreet_hsapi>
+                                            <title>Highstreet</title>
+                                        </highstreet_hsapi>
+                                    </children>
+                                </config>
+                            </children>
+                        </system>
+                    </children>
+                </admin>
+            </resources>
+        </acl>
+    </adminhtml>
 </config>

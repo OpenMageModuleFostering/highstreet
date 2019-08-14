@@ -83,7 +83,24 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
     }
 
     public function pingAction() {
-        $this->_JSONencodeAndRespond(array("OK"));
+        $configApi = Mage::helper('highstreet_hsapi/config_api');
+        $this->_JSONencodeAndRespond("OK");
+    }
+
+    public function infoAction() {
+        $encryptionHelper = Mage::helper('highstreet_hsapi/encryption');
+        if (!$encryptionHelper->APISignatureStringIsValid()) {
+            $this->_respondWith401();
+            return;
+        }
+
+        $configApi = Mage::helper('highstreet_hsapi/config_api');
+        $this->_JSONencodeAndRespond(array("status" => "OK", 
+                                            "identifer" => $configApi->storeIdentifier(), 
+                                            "version" => (string)Mage::getConfig()->getNode()->modules->Highstreet_Hsapi->version,
+                                            "magento_version" => (string)Mage::getVersion(),
+                                            "environment" => $configApi->environment(),
+                                            "storefront" => Mage::app()->getStore()->getCode()));
     }
 
     /**
@@ -130,32 +147,36 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
     public function checkoutAction() {
         $requestObject = Mage::app()->getRequest();
         $data = json_decode($requestObject->getParam('products'), true);
+        $country = $requestObject->getParam('country');     
+        return $this->_postCheckout($data["checkout"],$country);
+    }
 
-        $checkoutModel = Mage::getModel('highstreet_hsapi/checkout');
-        $checkoutModel->fillCartWithProductsAndQuantities($data["checkout"]);
+    public function checkout_v2Action() {
+        $requestObject = Mage::app()->getRequest();
+        $data = json_decode($requestObject->getParam('items'), true);
 
-        $locale = Mage::app()->getLocale()->getLocaleCode();
-        
         $country = $requestObject->getParam('country');
-        $country = preg_replace("/[^a-zA-Z]/", "", $country);
-        $country = strtoupper($country);
+        return $this->_postCheckout($data,$country,true);
+        
+    }
 
-        if ($country === "") { // No country given in URL, fallback on store country from locale
-            $locale = Mage::app()->getLocale()->getLocaleCode();
-            $country = strtoupper(substr($locale, strpos($locale, "_")+1));
+    private function _postCheckout($items,$country = null,$v2 = false) {
+        if($v2) {
+            $checkoutModel = Mage::getModel('highstreet_hsapi/checkoutV2');
+        } else {
+            $checkoutModel = Mage::getModel('highstreet_hsapi/checkout');
         }
 
-        Mage::getSingleton('core/session')->setHSCheckoutCountry($country);
+        $checkoutModel->fillCartWithProductsAndQuantities($items);
 
         $urlOptions = array();
         if (!empty($_SERVER['HTTPS'])) { // Server is not HTTPS
             $urlOptions['_secure'] = TRUE;
         }
         
-        $config = Mage::helper('highstreet_hsapi/config');
-        $checkoutUrl = $config->checkoutUrl();
+        $checkoutModel = Mage::getModel('highstreet_hsapi/checkoutV2');
         
-        Mage::app()->getFrontController()->getResponse()->setRedirect(Mage::getUrl($checkoutUrl, $urlOptions));
+        $this->_JSONencodeAndRespond($checkoutModel->getStartData());
     }
 
 
@@ -169,6 +190,17 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
 
     }
 
+    public function cart_v2Action() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            return $this->postCart_v2();
+        }
+        else if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            return $this->getCart_v2();
+        }
+
+    }
+
+
 
     public function postCart() {
         $requestObject = Mage::app()->getRequest();
@@ -176,6 +208,17 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
 
         $checkoutModel = Mage::getModel('highstreet_hsapi/checkout');
         $cart = $checkoutModel->getQuoteWithProductsAndQuantities($data["checkout"]);
+
+        $this->_JSONencodeAndRespond($cart);
+
+    }
+
+    public function postCart_v2() {
+        $requestObject = Mage::app()->getRequest();
+        $data = json_decode($requestObject->getParam('items'), true);
+        
+        $checkoutModel = Mage::getModel('highstreet_hsapi/checkoutV2');
+        $cart = $checkoutModel->getQuoteWithProductsAndQuantities($data);
 
         $this->_JSONencodeAndRespond($cart);
 
@@ -197,6 +240,22 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
 
     }
 
+    public function getCart_v2() {
+        $requestObject = Mage::app()->getRequest();
+        $quote_id = $requestObject->getParam('quote_id');
+        if(!$quote_id) {
+            $this->_respondWith404();
+            return false;
+        }
+
+        $checkoutModel = Mage::getModel('highstreet_hsapi/checkoutV2');
+        $cart = $checkoutModel->getQuoteWithProductsAndQuantities(null,$quote_id);
+
+        $this->_JSONencodeAndRespond($cart);
+
+
+    }
+
     /**
      * Get single product
      */
@@ -204,12 +263,26 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
     {
         $requestObject = Mage::app()->getRequest();
         $model = Mage::getModel('highstreet_hsapi/products');
-        
-        $id = $requestObject->getParam('id');
-        $attributes = $requestObject->getParam('attributes');
-        $child_product_attributes = $requestObject->getParam('child_product_attributes');
 
-        $response = $model->getSingleProduct($id, $attributes,$child_product_attributes);
+        $productObject = Mage::getModel('catalog/product')->load($requestObject->getParam('id'));
+
+        if (!$productObject->getId()) {
+            $this->_respondWith404();
+            return false;
+        }
+
+        if (isset($_SERVER["HTTP_IF_MODIFIED_SINCE"]) && $_SERVER["HTTP_IF_MODIFIED_SINCE"] !== NULL) {
+            if (!$model->productHasBeenModifiedSince($productObject, $_SERVER["HTTP_IF_MODIFIED_SINCE"])) {
+                $this->_respondWith304();
+                return false;
+            }
+        }
+
+        $response = $model->getSingleProduct($productObject, 
+                                            $requestObject->getParam('additional_attributes'), 
+                                            $requestObject->getParam('include_configuration_details'),
+                                            $requestObject->getParam('include_media_gallery'));
+
 
         if ($response == null) {
             $this->_respondWith404();
@@ -249,13 +322,16 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
         $requestObject = Mage::app()->getRequest();
         $model = Mage::getModel('highstreet_hsapi/products');
         
-        $products = $model->getProductsForResponse($requestObject->getParam('attributes'), 
-                                                    $requestObject->getParam('child_product_attributes'),
+        $products = $model->getProductsForResponse($requestObject->getParam('additional_attributes'), 
                                                     $requestObject->getParam('order'), 
                                                     $requestObject->getParam('range'), 
                                                     $requestObject->getParam('filter'),
                                                     $requestObject->getParam('search'),
-                                                    $requestObject->getParam('id'));
+                                                    $requestObject->getParam('id'),
+                                                    $requestObject->getParam('hide_attributes'),
+                                                    $requestObject->getParam('hide_filters'), 
+                                                    $requestObject->getParam('include_configuration_details'),
+                                                    $requestObject->getParam('include_media_gallery'));
 
         if ($products == null) {
             $this->_respondWith404();
@@ -273,15 +349,34 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
     {
         $requestObject = Mage::app()->getRequest();
         $model = Mage::getModel('highstreet_hsapi/products');
-        
-        $products = $model->getBatchProducts($requestObject->getParam('ids'),
-                                             $requestObject->getParam('attributes'),
-                                             $requestObject->getParam('child_product_attributes'));
 
-        if ($products == null) {
-            $this->_respondWith404();
-            return false;
+        $idsArray = explode(',', $requestObject->getParam('ids'));
+        $productObjects = array();
+
+        foreach ($idsArray as $value) {
+            $productObject = Mage::getModel('catalog/product')->load($value);
+            $productObjects[] = $productObject;
         }
+
+        if (isset($_SERVER["HTTP_IF_MODIFIED_SINCE"]) && $_SERVER["HTTP_IF_MODIFIED_SINCE"] !== NULL) {
+            $productHasChanged = false;
+
+            foreach ($productObjects as $productObject) {
+                if ($model->productHasBeenModifiedSince($productObject, $_SERVER["HTTP_IF_MODIFIED_SINCE"])) {
+                    $productHasChanged = true;
+                }
+            }
+
+            if (!$productHasChanged) {
+                $this->_respondWith304();
+                return false;
+            }
+        }
+        
+        $products = $model->getBatchProducts($productObjects,
+                                             $requestObject->getParam('additional_attributes'),
+                                             $requestObject->getParam('include_configuration_details'),
+                                             $requestObject->getParam('include_media_gallery'));
 
         $this->_JSONencodeAndRespond($products);
     }
@@ -296,9 +391,11 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
 
         $response = $productsModel->getRelatedProducts($requestObject->getParam('type'), 
                                                        $requestObject->getParam('id'), 
-                                                       $requestObject->getParam('attributes'), 
-                                                       $requestObject->getParam('child_product_attributes'),
-                                                       $requestObject->getParam('range'));
+                                                       $requestObject->getParam('additional_attributes'), 
+                                                       $requestObject->getParam('range'),
+                                                       $requestObject->getParam('hide_attributes'),
+                                                       $requestObject->getParam('include_configuration_details'),
+                                                       $requestObject->getParam('include_media_gallery'));
 
         if ($response == null) {
             $this->_respondWith404();
@@ -337,13 +434,11 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
         /** @var  $params */
         $params = $helper->extractRequestParam(Mage::app()->getRequest()->getParams());
 
-        if(is_string($params))
-        {
+        if (is_string($params)) {
             //get Single Attribute
             $attributes = $attributesModel->getAttribute($params);
             $responseBody = $attributes;
-        }
-        else{
+        } else {
             //Get all attributes
             $attributes = $attributesModel->getAttributes();
             $responseBody = $attributes;
@@ -377,13 +472,58 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
 
         $this->_JSONencodeAndRespond($response, FALSE);
     }
-    
+
+    public function getOrderAction () {
+        $encryptionHelper = Mage::helper('highstreet_hsapi/encryption');
+        if (!$encryptionHelper->APISignatureStringIsValid()) {
+            $this->_respondWith401();
+            return;
+        }
+
+        $requestObject = Mage::app()->getRequest();
+
+        $quoteIds = array();
+        if ($requestObject->getParam('quote_id') != null) {
+            $quoteIds[] = $requestObject->getParam('quote_id');
+        } 
+
+        if ($requestObject->getParam('quote_ids') != null) {
+            $quoteIds = array_merge($quoteIds, explode(',', $requestObject->getParam('quote_ids')));
+        }
+
+        $checkoutModel = Mage::getModel('highstreet_hsapi/checkoutV2');
+
+        $response = array();
+        foreach ($quoteIds as $quoteId) {
+            $quote = Mage::getModel('sales/quote')->loadByIdWithoutStore($quoteId); 
+            $order = Mage::getModel('sales/order')->loadByIncrementId($quote->getData('reserved_order_id'));
+
+            $response[] = $checkoutModel->getOrderInformationFromOrderObject($order, $quoteId);
+        }
+
+        $this->_JSONencodeAndRespond($response);
+    }
+
     /**
      * Header and http functions
      */
+    private function _respondWith304()
+    {
+        $this->getResponse()->setHeader('HTTP/1.1','304 Not Modified');
+        $this->getResponse()->sendHeaders();
+        return;
+    }
+    
     private function _respondWith404()
     {
         $this->getResponse()->setHeader('HTTP/1.1','404 Not Found');
+        $this->getResponse()->sendHeaders();
+        return;
+    }
+
+    private function _respondWith401()
+    {
+        $this->getResponse()->setHeader('HTTP/1.1','401 Unauthorized');
         $this->getResponse()->sendHeaders();
         return;
     }

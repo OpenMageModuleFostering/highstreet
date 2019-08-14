@@ -27,7 +27,11 @@ class Highstreet_Hsapi_Model_Images extends Mage_Core_Model_Abstract
 
             $originalSize = $image->getOriginalSize();
             if ($size) {
-                list($width, $height) = explode('x', $size);
+
+                $explodedSize = explode('x', $size);
+                if (count($explodedSize) > 1) {
+                    list($width, $height) = $explodedSize;
+                }
 
                 if (!empty($width) && !empty($height)) { 
                     $image->resize($width, $height);
