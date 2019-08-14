@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package>
+    <name>Highstreet</name>
+    <version>1.0.0</version>
+    <stability>stable</stability>
+    <license>-</license>
+    <channel>community</channel>
+    <extends/>
+    <summary>Highstreet Magento Extension. This extension allows the Highstreet iPad app to connect to the store. </summary>
+    <description>The extension provides read-only access to the catalog (products and categories) by providing a simple API for the app. &#xD;
+This extension does not modify or affect the Magento installation, nor does it change any catalog data.</description>
+    <notes>- First public release of the Highstreet Magento extension</notes>
+    <authors><author><name>Christian Apers</name><user>Christian</user><email>Christian@Touchwonders.com</email></author><author><name>Tim Wachter</name><user>Tim</user><email>Tim@Touchwonders.com</email></author></authors>
+    <date>2014-08-08</date>
+    <time>08:09:01</time>
+    <contents><target name="magecommunity"><dir name="Technooze"><dir name="Timage"><dir name="Block"><file name="Data.php" hash="02f8402df49abe64716e01746055330e"/></dir><dir name="Helper"><file name="Data.php" hash="4ade060d79bd29a91a524fce9e61e49b"/><file name="Data.php" hash="4ade060d79bd29a91a524fce9e61e49b"/></dir><dir name="etc"><file name="config.xml" hash="ff5675c31f16c03674ae87f19964a59d"/><file name="config.xml" hash="ff5675c31f16c03674ae87f19964a59d"/></dir></dir></dir></target><target name="magelocal"><dir name="Highstreet"><dir name="Hsapi"><dir name="Helper"><file name="Data.php" hash="94ba070797ec9925a331969b012be7f6"/><file name=".DS_Store" hash="194577a7e20bdcc7afbb718f502c134c"/></dir><dir name="Model"><file name="Attributes.php" hash="6ad75fe439bfc6993ff741b2ae452150"/><file name="Categories.php" hash="79c3135fe7d99bf8f2cc1776bf792cb0"/><file name="Checkout.php" hash="b6c4606464818bf9cb4cceb766105c2e"/><file name="Images.php" hash="32d65360440199910c05b1e087c1cee2"/><file name="Observer.php" hash="3797806da488c928c0cbc543ce98763c"/><file name="Products.php" hash="24942419f4fdd676ad8ca8b462c30a03"/><file name="SearchSuggestions.php" hash="17e0a008e2f90c0f5f6c5f7c3f010c9c"/><file name=".DS_Store" hash="194577a7e20bdcc7afbb718f502c134c"/></dir><dir name="controllers"><file name="IndexController.php" hash="79797b7b4fbc842a4c63dfaef03ac7f0"/><file name=".DS_Store" hash="194577a7e20bdcc7afbb718f502c134c"/></dir><dir name="etc"><file name="Configuration.json" hash="d35d719b384223addf201cf847ce6963"/><file name="config.xml" hash="b4f33b6ea6e8f24e7bacd85a48763cd4"/><file name=".DS_Store" hash="194577a7e20bdcc7afbb718f502c134c"/></dir><file name=".DS_Store" hash="bdce70b0d3d7ee6d49b036d8339f2acc"/></dir><file name=".DS_Store" hash="194577a7e20bdcc7afbb718f502c134c"/></dir></target><target name="mageetc"><dir name="modules"><file name="Highstreet_Api.xml" hash="97e586a7ef0a274d4f0fda883c646f31"/><file name="Technooze_Timage.xml" hash="bec7a12e3028d25b3a28c6eafe1878b4"/><file name="Highstreet_SmartAppBanner.xml" hash=""/></dir></target><target name="magelocale"><dir><dir name="en_US"><file name="Highstreet_Hsapi.csv" hash="1764bb5d414822ec79e1f39199f785b3"/></dir><dir name="nl_NL"><file name="Highstreet_Hsapi.csv" hash="4e3bab835cb6cd465bee52bebe393f67"/></dir></dir></target></contents>
+    <compatible/>
+    <dependencies><required><php><min>5.0.0.0</min><max>6.0.0.0</max></php><extension><name>gd</name><min>2.0</min><max>3.0</max></extension></required></dependencies>
+</package>

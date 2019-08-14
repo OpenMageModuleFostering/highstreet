@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+
+<config>
+    <modules>
+        <Highstreet_Hsapi>
+            <active>true</active>
+            <codePool>local</codePool>
+        </Highstreet_Hsapi>
+    </modules>
+</config>

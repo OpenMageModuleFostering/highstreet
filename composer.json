@@ -1,0 +1,16 @@
+{
+    "name": "OpenMageModuleFostering/Highstreet",
+    "type": "magento-module",
+    "license": "-",
+    "homepage": "",
+    "description": "Highstreet Magento Extension. This extension allows the Highstreet iPad app to connect to the store. ",
+    "authors": [
+    {
+        "name": "Christian Apers",
+        "email": "Christian@Touchwonders.com"
+    }
+],
+    "suggest": {
+        "magento-hackathon/magento-composer-installer": "*"
+    }
+}

@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Highstreet_HSAPI_module
+ *
+ * @package     Highstreet_Hsapi
+ * @author      Tim Wachter (tim@touchwonders.com) ~ Touchwonders
+ * @copyright   Copyright (c) 2013 Touchwonders b.v. (http://www.touchwonders.com/)
+ */
+ -->
+<config>
+    <modules>
+        <Highstreet_Hsapi>
+            <version>1.0.0</version>
+        </Highstreet_Hsapi>
+    </modules>
+    <frontend>
+        <routers>
+            <hsapi>
+                <use>standard</use>
+                <args>
+                    <module>Highstreet_Hsapi</module>
+                    <frontName>hsapi</frontName>
+                </args>
+            </hsapi>
+        </routers>
+        <translate> 
+            <modules> 
+                <Highstreet_Hsapi> 
+                    <files> 
+                        <default>Highstreet_Hsapi.csv</default> 
+                    </files> 
+                </Highstreet_Hsapi> 
+            </modules> 
+        </translate>
+        <layout>
+            <updates>
+                <hsapi>
+                    <file>highstreet/checkout.xml</file>
+                </hsapi>
+            </updates>
+        </layout>
+    </frontend>
+    <global>
+        <models>
+            <highstreet_hsapi>
+                <class>Highstreet_Hsapi_Model</class>
+            </highstreet_hsapi>
+        </models>
+        <helpers>
+            <highstreet_hsapi>
+                <class>Highstreet_Hsapi_Helper</class>
+            </highstreet_hsapi>
+        </helpers>
+        <blocks>
+            <highstreet_hsapi>
+                <class>Highstreet_Hsapi_Block</class>
+            </highstreet_hsapi>
+        </blocks>
+        <resources>
+            <highstreet_hsapi_setup>
+                <setup>
+                    <module>Highstreet_Hsapi</module>
+                </setup>
+            </highstreet_hsapi_setup>
+        </resources>
+        <events>
+            <sales_quote_merge_before>
+                <observers>
+                    <highstreet_hsapi_merge_quote>
+                        <type>singleton</type>
+                        <class>Highstreet_Hsapi_Model_Observer</class>
+                        <method>mergeQuote</method>
+                    </highstreet_hsapi_merge_quote>
+                </observers>
+            </sales_quote_merge_before>
+        </events>
+    </global>
+</config>
