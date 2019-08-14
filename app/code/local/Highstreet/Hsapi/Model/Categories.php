@@ -4,7 +4,7 @@
  *
  * @package     Highstreet_Hsapi
  * @author      Tim Wachter (tim@touchwonders.com) ~ Touchwonders
- * @copyright   Copyright (c) 2013 Touchwonders b.v. (http://www.touchwonders.com/)
+ * @copyright   Copyright (c) 2015 Touchwonders b.v. (http://www.touchwonders.com/)
  */
 
 class Highstreet_Hsapi_Model_Categories extends Mage_Core_Model_Abstract
@@ -12,78 +12,23 @@ class Highstreet_Hsapi_Model_Categories extends Mage_Core_Model_Abstract
     const CATEGORY_MEDIA_PATH = "/media/catalog/category/";
 
     /**
-     * Get category and children from id
-     * @param $categoryId
-     *
-     * @return bool
-     */
-    public function getCategories($categoryId)
-    {
-        $categoryObject = Mage::getModel('catalog/category')->load($categoryId);
-
-        $productCollection = $categoryObject->getProductCollection()
-                                            ->addAttributeToFilter('visibility', array('in' => array(
-                                                                    Mage_Catalog_Model_Product_Visibility::VISIBILITY_IN_CATALOG,
-                                                                    Mage_Catalog_Model_Product_Visibility::VISIBILITY_BOTH))
-                                                                );
-
-        $name = $categoryObject->getData('name');
-        if (!empty($name)) {
-            $category = array();
-            $category['id'] = $categoryId;
-            $category['title'] = $categoryObject->getData('name');
-            $category['include_in_menu'] = (bool)$categoryObject->getData('include_in_menu');
-
-            if ($categoryObject->getImage()) {
-                $imageUrl = self::CATEGORY_MEDIA_PATH . $categoryObject->getImage();
-            } else {
-                $imageUrl = '';
-            }
-            $category['image'] = $imageUrl;
-
-            $category['product_count'] = $productCollection->count();
-
-            // category children
-            $children = $this->getChildrenCollectionForCategoryId($categoryId);
-
-            if ($children->count() > 0) {
-                $category['children'] = array();
-                
-                foreach ($children as $child) {
-                    if ($child->getImage()) {
-                        $childImageUrl = self::CATEGORY_MEDIA_PATH . $child->getImage();
-                    } else {
-                        $childImageUrl = '';
-                    }
-                    array_push($category['children'], array(
-                        'id'             => $child->getData('entity_id'),
-                        'title'          => $child->getData('name'),
-                        'image'          => $childImageUrl,
-                        'include_in_menu'=> (bool)$child->getData('include_in_menu')
-                    ));
-                }
-            }
-
-            return $category;
-        }
-        else {
-            return false;
-        }
-    }
-
-    /**
      * Gets the entire category tree. Can be filtered for a specific category with param categoryId
      *
      * @param integer categoryId, a categoryId which will filter the tree
+     * @param integer maxDepth, Maxmimum depth of category tree to be gotten
+     * @param integer currentDepth, Current depth
      * @return array Array of categories
      */
-    public function getCategoryTree($categoryId = null) {
-        if ($categoryId == null) {
+    public function getCategory($categoryId = null, $maxDepth = -1, $currentDepth = 0) {
+        if ($categoryId === null || $categoryId === "tree") {
             $categoryId = Mage::app()->getStore()->getRootCategoryId();
-        }
+        } 
 
-        $categoryObject = Mage::getModel('catalog/category')->load($categoryId);
-        $children = $this->getChildrenCollectionForCategoryId($categoryId);
+        if (is_a($categoryId, "Mage_Catalog_Model_Category")) {
+            $categoryObject = $categoryId;
+        } else {
+            $categoryObject = Mage::getModel('catalog/category')->load($categoryId);
+        }
 
         $productCollection = $categoryObject->getProductCollection()
                                             ->addAttributeToFilter('visibility', array('in' => array(
@@ -94,7 +39,7 @@ class Highstreet_Hsapi_Model_Categories extends Mage_Core_Model_Abstract
         $name = $categoryObject->getData('name');
         if (!empty($name)) {
             $category = array();
-            $category['id'] = $categoryId;
+            $category['id'] = $categoryObject->getData('entity_id');
             $category['title'] = $name;
             $category['position'] = $categoryObject->getData('position');
 
@@ -107,17 +52,21 @@ class Highstreet_Hsapi_Model_Categories extends Mage_Core_Model_Abstract
 
             $category['include_in_menu'] = (bool)$categoryObject->getData('include_in_menu');
 
-            $category['product_count'] = $productCollection->count();
+            $category['product_count'] = $productCollection->getSize();
+
+            $category['default_sort_by'] = $categoryObject->getDefaultSortBy();
 
             // category children
             $category['children'] = array();
-            if ($children->count() > 0) {
-                foreach ($children as $child) {
-                    
-                    $childRepresentation = $this->getCategoryTree($child->getData('entity_id'));
+            if ($maxDepth < 0 || ($maxDepth > 0 && $maxDepth > $currentDepth)) {
+                $children = $this->getChildrenCollectionForCategoryId($categoryObject->getData('entity_id'));
+                if ($children->count() > 0) {
+                    foreach ($children as $child) {
+                        $childRepresentation = $this->getCategory($child, $maxDepth, $currentDepth+1);
 
-                    if (is_array($childRepresentation)) {
-                        array_push($category['children'], $childRepresentation);
+                        if (is_array($childRepresentation)) {
+                            array_push($category['children'], $childRepresentation);
+                        }
                     }
                 }
             }

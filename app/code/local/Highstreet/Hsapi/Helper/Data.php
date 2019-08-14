@@ -4,7 +4,7 @@
  *
  * @package     Highstreet_Hsapi
  * @author      Tim Wachter (tim@touchwonders.com) ~ Touchwonders
- * @copyright   Copyright (c) 2013 Touchwonders b.v. (http://www.touchwonders.com/)
+ * @copyright   Copyright (c) 2015 Touchwonders b.v. (http://www.touchwonders.com/)
  */
 
 class Highstreet_Hsapi_Helper_Data extends Mage_Core_Helper_Abstract
@@ -95,15 +95,11 @@ class Highstreet_Hsapi_Helper_Data extends Mage_Core_Helper_Abstract
                 
                 // Check if there is an category ID set 
                 if (empty($categoryId) || !is_numeric($categoryId)) {
-                    $store = Mage::getModel('core/store')->load(Mage_Core_Model_App::DISTRO_STORE_ID);
+                    $store = Mage::app()->getStore(Mage_Core_Model_App::DISTRO_STORE_ID);
                     $categoryId = $store->getRootCategoryId();
                 }
                 
                 $data = array("query_text" => $searchString, "popularity" => 1);
-
-                if ($this->searchSuggestionTableHasHSAPIColumn()) {
-                    $data["hsapi_category_id"] = $categoryId;
-                }
 
                 $catalogSearchSaveModel->addData($data);
                 $catalogSearchSaveModel->setIsProcessed(1);
@@ -118,27 +114,4 @@ class Highstreet_Hsapi_Helper_Data extends Mage_Core_Helper_Abstract
             );
         }
     }
-
-    /**
-     * Returns a BOOL wether the "catalogsearch/query" table has the HSAPI category column
-     * 
-     * @return bool 
-     */
-    public function searchSuggestionTableHasHSAPIColumn() {
-        try {
-            $catalogSearchReadModel = Mage::getModel('catalogsearch/query')->getCollection();
-            $catalogSearchReadModel->addFieldToSelect('hsapi_category_id');
-            $catalogSearchReadModel->getSelect()->limit(1);
-            $catalogSearchReadModel->getData();
-            return TRUE;
-        } catch (Exception $e) {
-            return FALSE;
-        }
-
-        return FALSE;
-    }
-
 }
-
-
-

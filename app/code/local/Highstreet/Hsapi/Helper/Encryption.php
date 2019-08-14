@@ -8,12 +8,7 @@
  */
 
 class Highstreet_Hsapi_Helper_Encryption extends Mage_Core_Helper_Abstract {
-    private $quoteIdHashSalt = "yw14dhejnr";
     private $hmacEncryptionKey = "5JbqhKdBGtV8J4PH82cm5YDr5f8b4Rbk";
-
-    public function hashQuoteId($quoteId = 0) {
-        return md5($quoteId . $this->quoteIdHashSalt);
-    }
 
     public function APISignatureStringIsValid() {
     	$givenAPISignature = $_SERVER['HTTP_X_API_SIGNATURE'];

@@ -12,6 +12,7 @@ class Highstreet_Hsapi_Helper_Config_Api extends Mage_Core_Helper_Abstract {
     const MIDDLEWARE_URL_ENVIRONMENT_STAGING = "api-dev";
     const MIDDLEWARE_URL_ENVIRONMENT_PRODUCTION = "api";
     const MIDDLEWARE_URL_HOST_PATH = "highstreetapp.com/hs-api/1.4";
+    const CHECKOUT_URL_FALLBACK = "checkout/cart";
 
     public function alwaysAddSimpleProductsToCart() {
         $alwaysAddSimpleProductsToCart = Mage::getStoreConfig('highstreet_hsapi/api/always_add_simple_products');
@@ -52,6 +53,16 @@ class Highstreet_Hsapi_Helper_Config_Api extends Mage_Core_Helper_Abstract {
         return ($app_name === NULL) ? "" : $app_name;
     }
 
+    public function standaloneCheckoutActive() {
+        $saco_active = Mage::getStoreConfig('highstreet_hsapi/api/checkout_saco_active');
+        return ($saco_active === NULL) ? true : (bool)$saco_active;
+    }
+
+    public function checkoutRedirectUrl() {
+        $checkout_redirect_url = Mage::getStoreConfig('highstreet_hsapi/api/checkout_redirect_url');
+        return ($checkout_redirect_url === NULL) ? self::CHECKOUT_URL_FALLBACK : $checkout_redirect_url;
+    }
+
     public function middlewareUrl() {
         if ($this->storeIdentifier() == "") {
             return NULL;
@@ -73,5 +84,19 @@ class Highstreet_Hsapi_Helper_Config_Api extends Mage_Core_Helper_Abstract {
 
     public function shouldShowNativeSmartbanner() {
         return ($this->nativeSmartbannerActive() && $this->nativeSmartbannerAppId() != "");
+    }
+
+    public function attributesSortOrderRaw() {
+        return Mage::getStoreConfig('highstreet_hsapi/api/attribute_sort_order');
+    }
+
+    public function attributesSortOrder() {
+        // Can return NULL or a string
+        $jsonString = $this->attributesSortOrderRaw();
+
+        // Will return NULL if given NULL or a malformed string
+        $data = json_decode($jsonString, true);
+        
+        return ($data === NULL) ? array() : $data;
     }
 }

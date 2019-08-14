@@ -4,7 +4,7 @@
  *
  * @package     Highstreet_Hsapi
  * @author      Tim Wachter (tim@touchwonders.com) ~ Touchwonders
- * @copyright   Copyright (c) 2013 Touchwonders b.v. (http://www.touchwonders.com/)
+ * @copyright   Copyright (c) 2015 Touchwonders b.v. (http://www.touchwonders.com/)
  */
 
 class Highstreet_Hsapi_Model_Attributes extends Mage_Core_Model_Abstract
@@ -17,6 +17,12 @@ class Highstreet_Hsapi_Model_Attributes extends Mage_Core_Model_Abstract
      * @var int
      */
     protected $_entityTypeId;
+
+    /**
+     * Often times the same attribute type needs to be retrieved multiple times, cache the responses for speed
+     * 
+     */
+    protected $_cachedAttributes = array();
 
     /**
      * Class constructor
@@ -47,8 +53,19 @@ class Highstreet_Hsapi_Model_Attributes extends Mage_Core_Model_Abstract
     public function getAttribute($code=null)
     {
         if(null != $code){
-            $response = $this->_extractResponse($this->_getAttribute($code));
-            return $response['attributes'][0];
+            if (array_key_exists($code, $this->_cachedAttributes)) {
+                return $this->_cachedAttributes[$code];
+            } else {
+                $attribute = $this->_extractResponse($this->_getAttribute($code));
+                
+                $response = array();
+                if (array_key_exists('attributes', $attribute) && count($attribute['attributes']) > 0) {
+                    $response = $attribute['attributes'][0];
+                } 
+
+                $this->_cachedAttributes[$code] = $response;
+                return $response;
+            }
         }
         return false;
     }
@@ -75,7 +92,7 @@ class Highstreet_Hsapi_Model_Attributes extends Mage_Core_Model_Abstract
      * @param null $code
      * @return Mage_Eav_Model_Entity_Attribute
      */
-    private function _getAttribute($code=null)
+    protected function _getAttribute($code=null)
     {
         $attributes = Mage::getResourceModel('eav/entity_attribute_collection')
             ->setEntityTypeFilter($this->_entityTypeId)
@@ -133,7 +150,7 @@ class Highstreet_Hsapi_Model_Attributes extends Mage_Core_Model_Abstract
     {
         $optionValues = array();
         //We need to load the attribute to be able to use it get the options
-        $attribute = Mage::getModel('eav/entity_attribute')->load($attributeId);
+        $attribute = Mage::getSingleton('eav/config')->getAttribute('catalog_product', $attributeId);
         $options = Mage::getModel('eav/entity_attribute_source_table')
             ->setAttribute($attribute)
             ->getAllOptions(false, false); //getAllOptions($withEmpty = true, $defaultValues = false)

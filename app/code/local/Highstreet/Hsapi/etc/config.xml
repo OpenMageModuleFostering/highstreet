@@ -5,13 +5,13 @@
  *
  * @package     Highstreet_Hsapi
  * @author      Tim Wachter (tim@touchwonders.com) ~ Touchwonders
- * @copyright   Copyright (c) 2013 Touchwonders b.v. (http://www.touchwonders.com/)
+ * @copyright   Copyright (c) 2015 Touchwonders b.v. (http://www.touchwonders.com/)
  */
  -->
 <config>
     <modules>
         <Highstreet_Hsapi>
-            <version>1.4.3</version>
+            <version>1.5.0</version>
         </Highstreet_Hsapi>
     </modules>
     <frontend>
@@ -24,16 +24,6 @@
                 </args>
             </hsapi>
         </routers>
-        <translate> 
-            <modules> 
-                <Highstreet_Hsapi> 
-                    <files> 
-                        <default>Highstreet_Hsapi.csv</default> 
-                    </files> 
-                </Highstreet_Hsapi> 
-            </modules> 
-        </translate>
-        
     </frontend>
     <global>
         <models>
@@ -68,7 +58,15 @@
                     </highstreet_hsapi_merge_quote>
                 </observers>
            </sales_quote_merge_before>           
-	       <sales_order_invoice_pay>
+	       <sales_order_place_after>
+                <observers>
+                    <highstreet_hsapi_sales_order_place_after>
+                        <class>Highstreet_Hsapi_Model_Observer</class>
+                        <method>salesOrderPlaceAfter</method>
+                    </highstreet_hsapi_sales_order_place_after>
+                </observers>
+            </sales_order_place_after>
+            <sales_order_invoice_pay>
                 <observers>
                     <highstreet_hsapi_sales_order_invoice_pay>
                         <class>Highstreet_Hsapi_Model_Observer</class>

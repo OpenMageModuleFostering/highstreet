@@ -4,14 +4,21 @@
  *
  * @package     Highstreet_Hsapi
  * @author      Tim Wachter (tim@touchwonders.com) ~ Touchwonders
- * @copyright   Copyright (c) 2013 Touchwonders b.v. (http://www.touchwonders.com/)
+ * @copyright   Copyright (c) 2015 Touchwonders b.v. (http://www.touchwonders.com/)
  */
 class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 {
+    const MEDIA_PATH = '/media/';
     const PRODUCTS_MEDIA_PATH = '/media/catalog/product';
     const NO_IMAGE_PATH = 'no_selection';
     const RANGE_FALLBACK_RANGE = 100;
     const SPECIAL_PRICE_FROM_DATE_FALLBACK = "1970-01-01 00:00:00";
+
+    protected $_attributesModel = null;
+
+    public function __construct() {
+        $this->_attributesModel = Mage::getModel('highstreet_hsapi/attributes');
+    }
 
     /**
      * Gets a single product for a given productId and attributes
@@ -88,14 +95,6 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
     {
         $searching = !empty($search);
 
-        $attributesArray = array();
-        // get attributes
-        if (!empty($additional_attributes)) {
-            $attributesArray = explode(',', $additional_attributes);
-        }
-
-        $attributesArray = array_merge($attributesArray, $this->_getCoreAttributes());
-
         // get order
         if (!empty($order)) {
             $order = explode(',', $order);
@@ -164,7 +163,7 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
         // apply search
         if ($categoryId && !$categoryNotSet) {
-           $collection->addCategoryFilter($category);
+           $collection = $this->_addCategoryFilterToProductCollection($collection, $category);
         } 
 
         if (!empty($range)) {
@@ -176,9 +175,21 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         }
 
         $collection->getSelect()->limit($range[1], $range[0]);
-    
-        // apply attributes        
-        $collection->addAttributeToSelect($attributesArray);
+
+        $attributesArray = array();
+        // get attributes
+        if (!empty($additional_attributes)) {
+            $attributesArray = $this->_translateAdditionalAttributes(explode(',', $additional_attributes));
+        }
+
+        $attributesArray = array_merge($attributesArray, $this->_getCoreAttributes());
+
+        // apply attributes
+        if (!$hideAttributes) {
+            $collection->addAttributeToSelect($attributesArray);
+        } else {
+            $collection->addAttributeToSelect('entity_id');
+        }
         
         //apply filters
         if(!empty($filters)) {
@@ -191,28 +202,6 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
                     }
                 }
             }
-        }
-        
-        // Apply type filter, we only want Simple and Configurable and Bundle products in our API
-        $collection->addAttributeToFilter('type_id', array('simple', 'configurable', 'bundle'));
-
-        // apply order
-        if (!empty($order)) {
-            foreach ($order as $orderCondition) {
-                $orderBy = explode(':', $orderCondition);
-                $collection->setOrder($orderBy[0], $orderBy[1]);
-            }
-        } else {
-            if($searching) {
-                $collection->setOrder('relevance', 'desc');
-            } else {
-
-                $sortKey = $category->getDefaultSortBy();
-                if (!$sortKey) {
-                    $sortKey = Mage::getStoreConfig('catalog/frontend/default_sort_by');
-                }
-                $collection->setOrder($sortKey, 'asc');
-            }   
         }
 
         // Add 'out of stock' filter, if preffered 
@@ -238,11 +227,16 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
                 $collection->addAttributeToFilter('entity_id', array('nin' => $outOfStockConfis));
             }
         }
-
-        if (!isset($productCount)) {
-            // get total product count
-            $productCount = $collection->getSize();
+        
+        // Apply type filter, we only want Simple and Configurable and Bundle products in our API
+        $collection->addAttributeToFilter('type_id', array('simple', 'configurable', 'bundle'));
+        // apply sort order
+        if($searching) {
+            $collection->setOrder('relevance', 'desc');
+        } else {
+            $collection = $this->_addSortingToProductCollection($collection, $order, $category);
         }
+
         /**
          * Format result array
          */
@@ -255,7 +249,10 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
                     array_push($products['products'], $this->_getProductAttributes($product, $additional_attributes, $include_configuration_details, $include_media_gallery));
                 }
             } else {
-                $products['products'] = $collection->getAllIds($range[1], $range[0]);
+                // getAllIds resets product order
+                foreach($collection as $product) {
+                    array_push($products['products'], $product->getEntityId());
+                }
             }
         }
 
@@ -263,8 +260,8 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         if (!$hideFilters) {
             $products['filters'] = $this->getFilters($categoryId);
         }
-        
-        $products['product_count'] = $productCount;
+
+        $products['product_count'] = $this->_getCountForProductCollection($collection, $categoryId, $categoryNotSet);
 
         $rangeLength = $range[1];
         if ($rangeLength > count($products["products"])) {
@@ -304,6 +301,7 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
         $collection = Mage::getModel('catalog/product')->getCollection()->addAttributeToFilter('entity_id', array('in' => $productIds)); 
 
+        $attributesArray = array();
         // get attributes
         if (!empty($additional_attributes)) {
             $attributesArray = explode(',', $additional_attributes);
@@ -355,7 +353,7 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
             $products['products'] = $collection->getAllIds();
         }
 
-        $products['product_count'] = $collection->getSize();
+        $products['product_count'] = $this->_getCountForProductCollection($collection);
 
         $rangeLength = $range[1];
         if ($rangeLength > count($products["products"])) {
@@ -516,23 +514,14 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         return $productModel->getUpSellProductIds();
     }
 
-
-
-    /***********************************/
-    /**
-     * PRIVATE/protected FUNCTIONS
-     */
-    /***********************************/
     /**
      * Returns filters
      *
      * @param int $categoryId
      * @return array
-     * @author Andrey Posudevsky
      *
      */
-    protected function getFilters($categoryId = false) {
-
+    public function getFilters($categoryId = false) {
         if (!$categoryId) {
             $categoryId = Mage::app()->getStore()->getRootCategoryId();
         }
@@ -541,7 +530,7 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
         $category = Mage::getModel('catalog/category')->load($categoryId);
         $layer->setCurrentCategory($category);
-        $controller = @Mage_Core_Controller_Front_Action::getLayout();
+        $controller = Mage::app()->getLayout();
         $attributes = $layer->getFilterableAttributes('price');
         $resultFilters = array();
         foreach ($attributes as $attribute) {
@@ -561,10 +550,10 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
                 array_push($options, array('value' => $option->getValue(), 'title' => $title, 'product_count' => $count));
             }
 
-            if (count($options) > 0) {
+            if (count($options) > 1) {
                 array_push($resultFilters, 
                     array(
-                        'title' => $attribute->getData('frontend_label'), 
+                        'title' => $attribute->getData('store_label'), 
                         'type' => $attribute->getFrontendInput(), 
                         'code' => $attribute->getAttributeCode(), 
                         'options' => $options
@@ -574,6 +563,90 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         }
 
         return $resultFilters;
+    }
+
+    /***********************************/
+    /**
+     * PRIVATE/protected FUNCTIONS
+     */
+    /***********************************/
+
+    /**
+     * Gets count for given collection. Function made for easier subclassing
+     *
+     * @param mixed Collection
+     * @param int Category ID, can be needed
+     * @param bool Category not set, used to signify if the category was set or not 
+     * @return int Product count
+     *
+     */
+
+    protected function _getCountForProductCollection ($collection = null, $categoryId = -1, $categoryNotSet = false) {
+        if ($collection === null) {
+            return -1;
+        }
+
+        return $collection->getSize();
+    }
+
+    /**
+     * Adds the category filter to a product collection. Function made for subclassing
+     * 
+     * @param mixed Collection
+     * @param mixed Category object
+     * @return mixed Collection
+     */
+
+    protected function _addCategoryFilterToProductCollection ($collection = null, $categoryObject = null) {
+        if ($collection === null || $categoryObject === null) {
+            return $collection;
+        }
+
+        $collection->addCategoryFilter($categoryObject);
+
+        return $collection;
+    }
+
+    /**
+     * Adds the sort order to a product collection. Function made for subclassing
+     * 
+     * @param mixed Collection
+     * @param mixed sortOrder
+     * @return mixed Collection
+     */
+
+    protected function _addSortingToProductCollection ($collection = null, $sortOrder = array(), $categoryObject = null) {
+        if ($collection === null) {
+            return $collection;
+        }
+
+        if (!empty($sortOrder)) {
+            foreach ($sortOrder as $orderCondition) {
+                $orderBy = explode(':', $orderCondition);
+                $collection->setOrder($orderBy[0], $orderBy[1]);
+            }
+        } else {
+            $sortKey = $categoryObject->getDefaultSortBy();
+            if (!$sortKey) {
+                $sortKey = Mage::getStoreConfig('catalog/frontend/default_sort_by');
+            }
+
+            $sortOrder = 'asc';
+            if ($sortKey == 'created_at' || $sortKey == 'updated_at') {
+                $sortOrder = 'desc';
+            }
+
+
+            $configApi = Mage::helper('highstreet_hsapi/config_api');
+            $sortOrderConfig = $configApi->attributesSortOrder();
+            if (array_key_exists($sortKey, $sortOrderConfig)) {
+                $sortOrder = $sortOrderConfig[$sortKey];
+            }
+
+            $collection->setOrder($sortKey, $sortOrder);
+        }
+
+        return $collection;
     }
 
     /**
@@ -588,7 +661,7 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
      *
      */
 
-    private function _getProductAttributes($resProduct = false, $additional_attributes = nil, $include_configuration_details = false, $include_media_gallery = false) {
+    private function _getProductAttributes($resProduct = false, $additional_attributes = null, $include_configuration_details = false, $include_media_gallery = false) {
         if (!$resProduct) {
             return null;
         }
@@ -643,112 +716,7 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         $product['attribute_values'] = array(); // Make sure to always return an object for this key
         // if additional attributes specified
         if (!empty($additionalAttributesArray) && count($additionalAttributesArray) > 0) {
-            $attributesModel = Mage::getModel('highstreet_hsapi/attributes');
-            
-            foreach ($additionalAttributesArray as $attribute) {
-                if ($attribute == "media_gallery") {
-                    continue;
-                }
-
-                if ($attribute === "share_url") {
-                    $additionalAttributeData = array();
-                    $additionalAttributeData['title'] = "Share url";
-                    $additionalAttributeData['code'] = "share_url";
-                    $additionalAttributeData['type'] = "url";
-                    $additionalAttributeData['inline_value'] = $resProduct->getProductUrl();
-                    $product['attribute_values'][] = $additionalAttributeData;
-
-                    continue;
-                }
-
-                $attributeObject = $resProduct->getResource()->getAttribute($attribute);
-
-                if ($attributeObject !== false) {
-                    $readableAttributeValue = $attributeObject->getFrontend()->getValue($resProduct); // 'frontend' value, human readable value
-
-                    $attributesData = $attributesModel->getAttribute($attribute);
-
-                    if ($attributesData['title'] == null ||
-                        $attributesData['code'] == null ||
-                        $attributeObject->getFrontendInput() == null) {
-                        continue;
-                    }
-
-                    // Pre-make attribute object to be put into json
-                    $additionalAttributeData = array();
-                    $additionalAttributeData['title'] = $attributesData['title'];
-                    $additionalAttributeData['code'] = $attributesData['code'];
-                    $additionalAttributeData['type'] = $attributeObject->getFrontendInput();
-
-                    // Switch statement from /app/code/core/Mage/Catalog/Model/Product/Attribute/Api.php:301
-                    // Gets all attribute types and fill in the value field of the attribute object
-                    switch ($attributesData['type']) {
-                        case 'text':
-                        case 'textarea':
-                        case 'price':
-                            $additionalAttributeData['inline_value'] = $readableAttributeValue;
-                        break;
-                        case 'date':
-                            if ($readableAttributeValue == null) {
-                                $additionalAttributeData['inline_value'] = null;
-                            } else {
-                                $additionalAttributeData['inline_value'] = strtotime($readableAttributeValue);
-                            }
-
-                            $additionalAttributeData['raw_value'] = $readableAttributeValue;
-                        break;
-                        case 'boolean':
-                            $attributeMethod = "get" . uc_words($attribute);
-                            $idAttributeValue = $resProduct->$attributeMethod();
-                            $additionalAttributeData['raw_value'] = $readableAttributeValue;
-                            $additionalAttributeData['inline_value'] = ($idAttributeValue == 1 ? true : false);
-                        break;
-                        case 'select':
-                        case 'multiselect':
-                            $hasFoundValue = false;
-                            $additionalAttributeData['value'] = array();
-
-                            $mutliSelectValues = $resProduct->getAttributeText($attribute); // Get values for multiselect type (array)
-
-                            // Loop trough select options of attribute
-                            foreach ($attributesData['options'] as $key => $value) {
-                                if (($value->title === $readableAttributeValue && $attributesData['type'] === 'select') ||  // If attribute type is single select option, check title
-                                    ((is_array($mutliSelectValues) && in_array($value->title, $mutliSelectValues) || ($value->title === $mutliSelectValues)) && 
-                                     $attributesData['type'] === 'multiselect') // If attribute type is multi select option, check if value is in array of possible options or equal to the title
-                                    ) {
-                                    $attributeValueObject = array();
-                                    $attributeValueObject['id'] = $value->value;
-                                    $attributeValueObject['title'] = $value->title;
-                                    $attributeValueObject['sort_hint'] = $value->sort_hint;
-                                    $additionalAttributeData['value'][] = $attributeValueObject;
-                                    $hasFoundValue = true;
-
-                                    if ($attributesData['type'] === 'select') {
-                                        break; // single select option doesn't have to loop trough all possibilities
-                                    }
-                                }
-                            }
-
-                            // If type is select and there is only one element, return the element as an object and not an array with 1 object
-                            if ($attributesData['type'] == 'select' && count($additionalAttributeData['value']) == 1) {
-                                $additionalAttributeData['value'] = $additionalAttributeData['value'][0];
-                            }
-
-                            // No value was found, make value field in attribute object null
-                            if (!$hasFoundValue) {
-                                $additionalAttributeData['value'] = null;
-                            }
-                        break;
-                        default:
-                            if ($readableAttributeValue != null) {
-                                $additionalAttributeData['inline_value'] = $readableAttributeValue;
-                            }
-                        break;
-                    }
-
-                    $product['attribute_values'][] = $additionalAttributeData;
-                }
-            }
+            $product['attribute_values'] = $this->_getAdditionalAttributesForProduct($resProduct, $additionalAttributesArray);
         } 
 
         $product['id'] = $resProduct->getId();
@@ -776,6 +744,11 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         }
 
         if($resProduct->getTypeId() == 'configurable' && $include_configuration_details){
+            // Remove `hs_specifications` attribute from additionalAttributes for child products, this is currently not needed and can make the API call much slower
+            if (($index = array_search('hs_specifications', $additionalAttributesArray)) !== FALSE) {
+                unset($additionalAttributesArray[$index]);
+            }
+
             $conf = Mage::getModel('catalog/product_type_configurable')->setProduct($resProduct);
 
             //build the configuration_attributes array
@@ -794,12 +767,11 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
                 ->addAttributeToSelect('*')
                 ->addFilterByRequiredOptions();
 
-            foreach($simple_collection as $simple_product){
+            foreach($simple_collection as $resProduct){
                 if(!Mage::getStoreConfig('cataloginventory/options/show_out_of_stock') 
-                    && !$simple_product->isSaleable())
+                    && !$resProduct->isSaleable())
                     continue;
 
-                $resProduct = Mage::getModel('catalog/product')->load($simple_product->getId());
                 if ($resProduct->getData('status') == Mage_Catalog_Model_Product_Status::STATUS_DISABLED || $resProduct->getStatus() == Mage_Catalog_Model_Product_Status::STATUS_DISABLED ||
                     $resProduct->getData('status') == "Uitgeschakeld" || $resProduct->getStatus() == "Uitgeschakeld") {
                     continue;
@@ -822,6 +794,11 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         }
 
         if($resProduct->getTypeId() == 'bundle' && $include_configuration_details) {
+            // Remove `hs_specifications` attribute from additionalAttributes for child products, this is currently not needed and can make the API call much slower
+            if (($index = array_search('hs_specifications', $additionalAttributesArray)) !== FALSE) {
+                unset($additionalAttributesArray[$index]);
+            }
+
             $bundleProduct = Mage::getModel('bundle/product_type')->setProduct($resProduct);
             $bundles = $bundleProduct->getOptionsCollection()->getData();
             foreach($bundles as $bundle) {
@@ -860,6 +837,150 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         return $product;
     }
 
+    protected function _getAdditionalAttributesForProduct($resProduct = null, $additionalAttributesArray) {
+        if ($resProduct === null) {
+            return array();
+        }
+
+        $response = array();
+
+        foreach ($additionalAttributesArray as $attribute) {
+            if ($attribute == "media_gallery") {
+                continue;
+            }
+
+            if ($attribute === "share_url") {
+                $additionalAttributeData = array();
+                $additionalAttributeData['title'] = "Share url";
+                $additionalAttributeData['code'] = "share_url";
+                $additionalAttributeData['type'] = "url";
+                $additionalAttributeData['inline_value'] = $resProduct->getProductUrl();
+                $response[] = $additionalAttributeData;
+
+                continue;
+            }
+
+            if ($attribute === "hs_specifications") {
+                $additionalAttributeData = array();
+                $additionalAttributeData['title'] = "Highstreet Specifications";
+                $additionalAttributeData['code'] = "hs_specifications";
+                $additionalAttributeData['type'] = "html";
+                $html = "";
+
+                // Register product in the Mage registry, needed for the following block
+                Mage::register('product', $resProduct);
+
+                // SEE: Mage_Catalog_Block_Product_View_Attributes
+                $controller = Mage::app()->getLayout();
+                $block = $controller->createBlock('Mage_Catalog_Block_Product_View_Attributes');
+
+                // Same function as used by the layouting
+                foreach ($block->getAdditionalData() as $attribute) {
+                    $html .=  "<p><strong>".$attribute['label'].":</strong></br>".$attribute['value']."</p>";
+                }
+
+                $additionalAttributeData['inline_value'] = $html;
+                $response[] = $additionalAttributeData;
+
+                // Take responsibility to unregister the product 
+                Mage::unregister('product');
+
+                continue;
+            }
+
+            $attributeObject = $resProduct->getResource()->getAttribute($attribute);
+
+            if ($attributeObject !== false) {
+                $readableAttributeValue = $attributeObject->getFrontend()->getValue($resProduct); // 'frontend' value, human readable value
+
+                $attributesData = $this->_attributesModel->getAttribute($attribute);
+
+                if (!array_key_exists('title', $attributesData) ||
+                    !array_key_exists('code', $attributesData) ||
+                    $attributesData['title'] == null ||
+                    $attributesData['code'] == null ||
+                    $attributeObject->getFrontendInput() == null) {
+                    continue;
+                }
+
+                // Pre-make attribute object to be put into json
+                $additionalAttributeData = array();
+                $additionalAttributeData['title'] = $attributesData['title'];
+                $additionalAttributeData['code'] = $attributesData['code'];
+                $additionalAttributeData['type'] = $attributeObject->getFrontendInput();
+
+                // Switch statement from /app/code/core/Mage/Catalog/Model/Product/Attribute/Api.php:301
+                // Gets all attribute types and fill in the value field of the attribute object
+                switch ($attributesData['type']) {
+                    case 'text':
+                    case 'textarea':
+                    case 'price':
+                        $additionalAttributeData['inline_value'] = $readableAttributeValue;
+                    break;
+                    case 'date':
+                        if ($readableAttributeValue == null) {
+                            $additionalAttributeData['inline_value'] = null;
+                        } else {
+                            $additionalAttributeData['inline_value'] = strtotime($readableAttributeValue);
+                        }
+
+                        $additionalAttributeData['raw_value'] = $readableAttributeValue;
+                    break;
+                    case 'boolean':
+                        $attributeMethod = "get" . uc_words($attribute);
+                        $idAttributeValue = $resProduct->$attributeMethod();
+                        $additionalAttributeData['raw_value'] = $readableAttributeValue;
+                        $additionalAttributeData['inline_value'] = ($idAttributeValue == 1 ? true : false);
+                    break;
+                    case 'select':
+                    case 'multiselect':
+                        $hasFoundValue = false;
+                        $additionalAttributeData['value'] = array();
+
+                        $mutliSelectValues = $resProduct->getAttributeText($attribute); // Get values for multiselect type (array)
+
+                        // Loop trough select options of attribute
+                        foreach ($attributesData['options'] as $key => $value) {
+                            if (($value->title === $readableAttributeValue && $attributesData['type'] === 'select') ||  // If attribute type is single select option, check title
+                                ((is_array($mutliSelectValues) && in_array($value->title, $mutliSelectValues) || ($value->title === $mutliSelectValues)) && 
+                                 $attributesData['type'] === 'multiselect') // If attribute type is multi select option, check if value is in array of possible options or equal to the title
+                                ) {
+                                $attributeValueObject = array();
+                                $attributeValueObject['id'] = $value->value;
+                                $attributeValueObject['title'] = $value->title;
+                                $attributeValueObject['sort_hint'] = $value->sort_hint;
+                                $additionalAttributeData['value'][] = $attributeValueObject;
+                                $hasFoundValue = true;
+
+                                if ($attributesData['type'] === 'select') {
+                                    break; // single select option doesn't have to loop trough all possibilities
+                                }
+                            }
+                        }
+
+                        // If type is select and there is only one element, return the element as an object and not an array with 1 object
+                        if ($attributesData['type'] == 'select' && count($additionalAttributeData['value']) == 1) {
+                            $additionalAttributeData['value'] = $additionalAttributeData['value'][0];
+                        }
+
+                        // No value was found, make value field in attribute object null
+                        if (!$hasFoundValue) {
+                            $additionalAttributeData['value'] = null;
+                        }
+                    break;
+                    default:
+                        if ($readableAttributeValue != null) {
+                            $additionalAttributeData['inline_value'] = $readableAttributeValue;
+                        }
+                    break;
+                }
+
+                $response[] = $additionalAttributeData;
+            }
+        }
+
+        return $response;
+    }
 
     /**
      * Converts product dates to timestamp
@@ -896,7 +1017,7 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
      * @return array Array of stock data
      */
 
-    private function _getStockInformationForProduct($product) {
+    protected function _getStockInformationForProduct($product) {
         $stock = Mage::getModel('cataloginventory/stock_item')->loadByProduct($product);
         $stockinfo = array();
 
@@ -940,8 +1061,11 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         return $product;
     }
 
-        /** 
+    /** 
      * Gets media gallery items for a given product id. Returns an array or media gallery items
+     *
+     * This function explicitly makes new product objects. 
+     * During development this was found to be faster then passing a product object and calling "->load('media_gallery')" on the object
      *
      * @param integer Product ID, ID of a product to get media gallery images for
      * @return array Array of media gallery items
@@ -956,6 +1080,11 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
         foreach (Mage::getModel('catalog/product')->load($productId)->getMediaGalleryImages()->getItems() as $key => $value) {
             $imageData = $value->getData();
+
+            if ($this->_shouldExcludeImageFromMediaGallery($imageData["file"], $resProduct)) {
+                continue;
+            }
+
             if (array_key_exists('file', $imageData) && !strstr($imageData['file'], self::PRODUCTS_MEDIA_PATH)) {
                 $imageData['file'] = self::PRODUCTS_MEDIA_PATH . $imageData['file'];
             }
@@ -966,6 +1095,26 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         }
         
         return $output;
+    }
+
+    /**
+     * Function that compares the given image to other images in the product object in order to determine of this image should be included in the media gallery
+     * Made for subclassing
+     */
+    protected function _shouldExcludeImageFromMediaGallery($image, $product) {
+        return false;
+    }
+
+    /**
+     * For some vendors we have implemented custom attribute names, if such an attribute needs a specific other attribute to load, we can override this function and do this.
+     * Implementation here is empty because we currently don't need it in the base class
+     *
+     * @param array $additionalAttributes, the array of additional attributes
+     * @return array Array of additional attributes
+     *
+     */
+    protected function _translateAdditionalAttributes($additionalAttributes) {
+        return $additionalAttributes;
     }
 
     /**

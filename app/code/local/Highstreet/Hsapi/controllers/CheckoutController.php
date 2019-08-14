@@ -4,7 +4,7 @@
  *
  * @package     Highstreet_Hsapi
  * @author      Tim Wachter (tim@touchwonders.com) ~ Touchwonders
- * @copyright   Copyright (c) 2014 Touchwonders b.v. (http://www.touchwonders.com/)
+ * @copyright   Copyright (c) 2015 Touchwonders b.v. (http://www.touchwonders.com/)
  */
 
 class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Action
@@ -83,34 +83,34 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
 
         if ($session->isLoggedIn()) {
             $success = false; 
-            $message = "Je bent al ingelogd.";
+            $message = "hsapi.loginAction.success.already";
         } else {
             try {
                 if ($session->login($email, $password)) {
                     $success = true; 
-                    $message = "Je bent succesvol ingelogd.";
+                    $message = "hsapi.loginAction.success";
                 }
             } catch (Mage_Core_Exception $e) {
                 switch ($e->getCode()) {
                     case Mage_Customer_Model_Customer::EXCEPTION_EMAIL_NOT_CONFIRMED: { // E-mail not confirmed
                         $success = false; 
-                        $message = "Je account is nog niet geactiveerd. Je moet je account activeren voordat je kunt inloggen.";
+                        $message = "hsapi.loginAction.error.activate";
                         break;
                     }
                     case Mage_Customer_Model_Customer::EXCEPTION_INVALID_EMAIL_OR_PASSWORD: { // E-mail or password wrong
                         $success = false; 
-                        $message = "De combinatie van het ingegeven e-mailadres en wachtwoord is onjuist.";
+                        $message = "hsapi.loginAction.error";
                         break;
                     }
                     default: {
                         $success = false; 
-                        $message = "Er heeft zich een onbekende fout voorgedaan. Probeer het later nog eens.";
+                        $message = "hsapi.loginAction.error.fatal";
                         break;
                     }
                 }
             } catch (Exception $e) {
                 $success = false; 
-                $message = "Er heeft zich een onbekende fout voorgedaan. Probeer het later nog eens.";
+                $message = "hsapi.loginAction.error.fatal";
             }
         }
 
@@ -140,6 +140,11 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
         if (isset($data['email'])) {
             $data['email'] = trim($data['email']);
         }
+
+        if (isset($data['telephone'])) { // We return the telephone number from Magento with a trailing space, put it trough trim before saving
+            $data['telephone'] = trim($data['telephone']);
+        }
+
         $result = $this->getOnepage()->saveBilling($data, $customerAddressId);
 
         if (!isset($result['error'])) {
@@ -168,6 +173,11 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
     {
         $data = $this->getRequest()->getPost('shipping', array());
         $customerAddressId = $this->getRequest()->getPost('shipping_address_id', false);
+
+        if (isset($data['telephone'])) { // We return the telephone number from Magento with a trailing space, put it trough trim before saving
+            $data['telephone'] = trim($data['telephone']);
+        }
+        
         $result = $this->getOnepage()->saveShipping($data, $customerAddressId);
 
         if (!isset($result['error'])) {
@@ -223,7 +233,7 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
         // Shopping cart is empty
         // The checkout should fire a restart
         if (!$quote->getItemsCount()) {
-            $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_FATAL, "message" => $this->__('hsapi.addCouponAction.error.fatal')));
+            $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_FATAL, "message" => 'hsapi.addCouponAction.error.fatal'));
             return;
         }
 
@@ -235,7 +245,7 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
 
         // No coupon code given 
         if (!strlen($couponCode) && !strlen($oldCouponCode)) {
-            $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_ERROR, "message" => $this->__('hsapi.addCouponAction.error.invalid')));
+            $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_ERROR, "message" => 'hsapi.addCouponAction.error.invalid'));
             return;
         }
 
@@ -243,7 +253,7 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
             $codeLength = strlen($couponCode);
             
             if ($codeLength >= self::COUPON_CODE_MAX_LENGTH) {
-                $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_ERROR, "message" => $this->__('hsapi.addCouponAction.error.length') . self::COUPON_CODE_MAX_LENGTH));
+                $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_ERROR, "message" => 'hsapi.addCouponAction.error.length'));
                 return;
             }
 
@@ -253,28 +263,28 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
 
             if ($codeLength) {
                 if ($couponCode == $quote->getCouponCode()) { // Code was successfully added
-                    $message = str_replace(self::COUPON_SUCCESS_REPLACE, $this->getRequest()->getParam('coupon_code'), $this->__('hsapi.addCouponAction.success'));
+                    $message = str_replace(self::COUPON_SUCCESS_REPLACE, $this->getRequest()->getParam('coupon_code'), 'hsapi.addCouponAction.success');
                     $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_SUCCESS, "message" => $message));
                     return;
                 } else { // Code was not valid
-                    $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_ERROR, "message" => $this->__('hsapi.addCouponAction.error.invalid')));
+                    $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_ERROR, "message" => 'hsapi.addCouponAction.error.invalid'));
                     return;
                 }
             } else {
-                $message = str_replace(self::COUPON_SUCCESS_REPLACE, $this->getRequest()->getParam('coupon_code'), $this->__('hsapi.addCouponAction.success.removed'));
+                $message = str_replace(self::COUPON_SUCCESS_REPLACE, $this->getRequest()->getParam('coupon_code'), 'hsapi.addCouponAction.success.removed');
                 $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_SUCCESS, "message" => $message));
                 return;
             }
 
         } catch (Mage_Core_Exception $e) {
-            $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_FATAL, "message" => $this->__('hsapi.addCouponAction.error.fatal')));
+            $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_FATAL, "message" => 'hsapi.addCouponAction.error.fatal'));
             return;
         } catch (Exception $e) {
-            $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_FATAL, "message" => $this->__('hsapi.addCouponAction.error.fatal')));
+            $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_FATAL, "message" => 'hsapi.addCouponAction.error.fatal'));
             return;
         }
 
-        $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_FATAL, "message" => $this->__('hsapi.addCouponAction.error.fatal')));
+        $this->_JSONencodeAndRespond(array("error" => self::COUPON_CODE_FATAL, "message" => 'hsapi.addCouponAction.error.fatal'));
         return;
     }
 
@@ -319,19 +329,6 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
     public function saveOrderAction() {
         $result = array();
         try {
-            $requiredAgreements = Mage::helper('checkout')->getRequiredAgreementIds();
-            if ($requiredAgreements) {
-                $postedAgreements = array_keys($this->getRequest()->getPost('agreement', array()));
-                $diff = array_diff($requiredAgreements, $postedAgreements);
-                if ($diff) {
-                    $result['success'] = false;
-                    $result['error'] = true;
-                    $result['error_messages'] = $this->__('Please agree to all the terms and conditions before placing the order.');
-                    $this->getResponse()->setBody(Mage::helper('core')->jsonEncode($result));
-                    return;
-                }
-            }
-
             if ($data = $this->getRequest()->getPost('payment', false)) {
                 $this->getOnepage()->getQuote()->getPayment()->importData($data);
             }
@@ -344,22 +341,6 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
             // On line 823 the "LastRealOderId" value is set in the session of the user
             // We can read this value to get the order ID and insert a comment in the order. 
             // This comment in the order is absolutely crucial for the order tracking of Highstreet. 
-
-            try {
-                $checkoutSession = Mage::getSingleton('checkout/session');
-                $orderId = $checkoutSession->getLastRealOrderId();
-                $quoteId = $checkoutSession->getLastSuccessQuoteId();
-                if ($orderId > 0 && $quoteId > 0) {
-                    $encryptionHelper = Mage::helper('highstreet_hsapi/encryption');
-                    $quoteIdHash = $encryptionHelper->hashQuoteId($quoteId);
-
-                    $order = Mage::getModel('sales/order')->loadByIncrementId($orderId);
-                    $order->addStatusHistoryComment('Order made via the Highstreet app. Quote hash:' . $quoteIdHash)
-                        ->setIsVisibleOnFront(false)
-                        ->setIsCustomerNotified(false);
-                    $order->save();
-                }
-            } catch (Exception $e) {}
 
             $redirectUrl = $this->getOnepage()->getCheckout()->getRedirectUrl();
             $result['success'] = true;
@@ -445,6 +426,9 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
         }
 
         $quote = Mage::getSingleton('checkout/cart')->getQuote();
+
+        $quote->getShippingAddress()->collectShippingRates();
+
         foreach ($quote->getShippingAddress()->getGroupedAllShippingRates() as $_rates) { 
             foreach ($_rates as $_rate){
                 $checked = false;
@@ -501,38 +485,48 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
             if (!empty($selectedPaymentMethod) && $selectedPaymentMethod == $code) {
                 $checked = true;
             } 
-
-            $object["title"] = $methodTitle;
+            
+            $object["title"] = str_replace("<br>", " ", $methodTitle);
             $object["code"] = $code;
             $object["checked"] = $checked;
 
-            if ($code === "buckaroo3extended_ideal") {
-                $session = Mage::getSingleton('checkout/session');
-                $sessionValue = $session->getData('buckaroo3extended_ideal_BPE_Issuer');
-                $buckarooIdealModel = new TIG_Buckaroo3Extended_Block_PaymentMethods_Ideal_Checkout_Form();
-                $issuerList = $buckarooIdealModel->getIssuerList();
-                
-                foreach ($issuerList as $issuer => $issuerDetails) { 
-                    $option = array();
-                    $optionChecked = false;
-                    if (!empty($sessionValue) && array_key_exists($sessionValue, $issuerList))  {
-                        if ($issuer == $sessionValue) {
-                            $optionChecked = true;
-                        }
-                    }
-
-                    $option["checked"] = $optionChecked;
-                    $option["title"] = $issuerDetails['name'];
-                    $option["code"] = $issuer;
-                    $option["image"] = $issuerDetails['logo'];
-                    $object["sub_options"][] = $option;
-                }
-            }
+            $object["sub_options"] = $this->_getSuboptionsForPaymentMethod($method);
 
             $paymentMethods[] = $object;
         }
 
         return $paymentMethods;
+    }
+
+    protected function _getSuboptionsForPaymentMethod($method) {
+        if ($method->getCode() === "buckaroo3extended_ideal") {
+            $options = array();
+
+            $session = Mage::getSingleton('checkout/session');
+            $sessionValue = $session->getData('buckaroo3extended_ideal_BPE_Issuer');
+            $buckarooIdealModel = new TIG_Buckaroo3Extended_Block_PaymentMethods_Ideal_Checkout_Form();
+            $issuerList = $buckarooIdealModel->getIssuerList();
+            
+            foreach ($issuerList as $issuer => $issuerDetails) { 
+                $option = array();
+                $optionChecked = false;
+                if (!empty($sessionValue) && array_key_exists($sessionValue, $issuerList))  {
+                    if ($issuer == $sessionValue) {
+                        $optionChecked = true;
+                    }
+                }
+
+                $option["checked"] = $optionChecked;
+                $option["title"] = $issuerDetails['name'];
+                $option["code"] = $issuer;
+                $option["image"] = $issuerDetails['logo'];
+                $options[] = $option;
+            }
+
+            return $options;
+        }
+
+        return null;
     }
 
     private function _getReviewData() {
@@ -550,8 +544,13 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
         $billing_address["email"] = $quote->getCustomerEmail();
         $billing_address["firstname"] = $billingAddressData["firstname"];
         $billing_address["lastname"] = $billingAddressData["lastname"];
-        $billing_address["telephone"] = (string) $billingAddressData["telephone"];
-        $billing_address["street"] = $billingAddressData["street"];
+        $billing_address["telephone"] = (string) $billingAddressData["telephone"] . " ";
+        $billingStreet = $billingAddress->getStreet();
+        if (is_array($billingStreet)) {
+            $billing_address["street"] = implode(' ', $billingStreet);
+        } else {
+            $billing_address["street"] = $billingStreet;
+        }
         $billing_address["postcode"] = $billingAddressData["postcode"];
         $billing_address["city"] = $billingAddressData["city"];
 
@@ -561,8 +560,13 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
         $shipping_address = array();
         $shipping_address["firstname"] = $shippingAddressData["firstname"];
         $shipping_address["lastname"] = $shippingAddressData["lastname"];
-        $shipping_address["telephone"] = (string) $shippingAddressData["telephone"];
-        $shipping_address["street"] = $shippingAddressData["street"];
+        $shipping_address["telephone"] = (string) $shippingAddressData["telephone"] . " ";
+        $shippingStreet = $shippingAddress->getStreet();
+        if (is_array($shippingStreet)) {
+            $shipping_address["street"] = implode(' ', $shippingStreet);
+        } else {
+            $shipping_address["street"] = $shippingStreet;
+        }
         $shipping_address["postcode"] = $shippingAddressData["postcode"];
         $shipping_address["city"] = $shippingAddressData["city"];
 
@@ -587,7 +591,7 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
     /**
      * Conveinience method, compares 2 formatted address arrays
      */
-    private function _billingAndShippingAddressesAreTheSame($billingAddressArray = array(), $shippingAddressArray = array()) {
+    protected function _billingAndShippingAddressesAreTheSame($billingAddressArray = array(), $shippingAddressArray = array()) {
         if (count($billingAddressArray) == 0 || count($shippingAddressArray) == 0) {
             return true;
         }
@@ -617,13 +621,13 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
     /**
      * Sets headers and body with proper JSON encoding
      */
-    private function _JSONencodeAndRespond($data, $numericCheck = true) {
+    protected function _JSONencodeAndRespond($data, $numericCheck = true) {
         //set response body
         $this->_setHeader();
-        if ($numericCheck) {
-            $this->getResponse()->setBody(json_encode($data, JSON_NUMERIC_CHECK));
-        } else {
+        if ($numeric_check === FALSE || version_compare(PHP_VERSION, '5.3.3', '<')) {
             $this->getResponse()->setBody(json_encode($data));
+        } else {
+            $this->getResponse()->setBody(json_encode($data, JSON_NUMERIC_CHECK));
         }
         
     }

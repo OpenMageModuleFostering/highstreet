@@ -4,13 +4,13 @@
  *
  * @package     Highstreet_Api
  * @author      Tim Wachter (tim@touchwonders.com)
- * @copyright   Copyright (c) 2014 Touchwonders (http://www.touchwonders.com/)
+ * @copyright   Copyright (c) 2015 Touchwonders (http://www.touchwonders.com/)
  */
 class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
 {
-    private $_errorCodes = array();
-    private $_errorMessages = array();
-    private $_productIdsNotAdded = array();
+    protected $_errorCodes = array();
+    protected $_errorMessages = array();
+    protected $_productIdsNotAdded = array();
 
 	/**
 	 * Fills the current session with cart data. This session automatically gets set trough the Magento models, this also inserts the current data in the database e.d.
@@ -36,7 +36,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         
 
         //add products
-        $this->getProductsInQuote($quote,$products,false);
+        $this->_addProductsToQuote($quote,$products,false);
 
         $cart->save();
         $quote->save();
@@ -76,12 +76,12 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         }
         
         if($products) {    
-            $this->getProductsInQuote($quote,$products);
+            $this->_addProductsToQuote($quote,$products);
         } 
-        
+
         
         //Shipping carries
-        $response['selected_shipping_method'] = $this->getSelectedShippingMethod($quote);
+        $response['selected_shipping_method'] = $this->_getSelectedShippingMethod($quote);
 
 
 
@@ -94,12 +94,10 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         if ($config->shippingInCartDisabled() && $response['selected_shipping_method'] === null) {
             $response['shipping'] = array();
         } else {
-            $response['shipping'] = array_values($this->getShippingMethods($quote, $response['selected_shipping_method']));
+            $response['shipping'] = array_values($this->_getShippingMethods($quote, $response['selected_shipping_method']));
         }
 
-
-
-        $response["totals"] = $this->getQuoteTotals($quote);
+        $response["totals"] = $this->_getQuoteTotals($quote);
 
         $quoteItems = $quote->getAllVisibleItems();
 
@@ -107,7 +105,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
 
         foreach($quoteItems as $quoteItem) {
             $product_hash = $this->_getQuoteItemHash($quoteItem);
-            $responseQuote[] = array_merge($this->getProductInQuoteResponse($quoteItem),$this->_getErrorForProduct($product_hash));
+            $responseQuote[] = array_merge($this->_getProductInQuoteResponse($quoteItem),$this->_getErrorForProduct($product_hash));
         }
 
         foreach($this->_productIdsNotAdded as $product_hash) {
@@ -173,7 +171,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
 
         $response['products'] = array();
         foreach ($quote->getAllVisibleItems() as $product) {
-            array_push($response['products'], $this->getProductInQuoteResponse($product));
+            array_push($response['products'], $this->_getProductInQuoteResponse($product));
         }
 
         return $response;
@@ -239,7 +237,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
             $billingAddressResponse["email"] = $billingAddressData["email"];
             $billingAddressResponse["firstname"] = $billingAddressData["firstname"];
             $billingAddressResponse["lastname"] = $billingAddressData["lastname"];
-            $billingAddressResponse["telephone"] = (string) $billingAddressData["telephone"];
+            $billingAddressResponse["telephone"] = (string) $billingAddressData["telephone"] . " ";
             $billingAddressResponse["street"] = $billingAddress->getStreet();
             $billingAddressResponse["postcode"] = $billingAddressData["postcode"];
             $billingAddressResponse["city"] = $billingAddressData["city"];
@@ -251,7 +249,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
             if ($shippingAddressData["firstname"] !== null) {
                 $shippingAddressResponse["firstname"] = $shippingAddressData["firstname"];
                 $shippingAddressResponse["lastname"] = $shippingAddressData["lastname"];
-                $shippingAddressResponse["telephone"] = (string) $shippingAddressData["telephone"];
+                $shippingAddressResponse["telephone"] = (string) $shippingAddressData["telephone"] . " ";
                 $shippingAddressResponse["street"] = $shippingAddress->getStreet();
                 $shippingAddressResponse["postcode"] = $shippingAddressData["postcode"];
                 $shippingAddressResponse["city"] = $shippingAddressData["city"];
@@ -277,7 +275,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
 
     //Helpers below
 
-    private function getProductsInQuote($quote,$products = null,$capAmount = true) {
+    protected function _addProductsToQuote($quote,$products = null,$capAmount = true) {
          $responseQuote = array();
         
 
@@ -296,7 +294,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
             $errorMessage = null;
 
             try {
-                $product = $this->loadProduct($product_id);
+                $product = $this->_loadProduct($product_id);
             } catch (Exception $e) {
                 $errorMessage = $e->getMessage();
                 $product = null;
@@ -319,7 +317,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
             if($product->getTypeId() == 'simple') {
                 $simple_product = $product;
             } else if($product->getTypeId() == 'configurable') {
-                $simple_product = $this->loadProduct($value['simple_product_id']);
+                $simple_product = $this->_loadProduct($value['simple_product_id']);
 
                 //if 'alwaysAddSimpleProductsToCart' is set, then we add the simple product of a configurable product to the cart
                 $config = Mage::helper('highstreet_hsapi/config_api');
@@ -349,7 +347,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
                     $isInStock = $itemInventory->getIsInStock();
                     $isStockManaged = $itemInventory->getManageStock();
                     $backordersAllowed = $itemInventory->getBackorders();
-
+                    $maxSaleQty = $itemInventory->getMaxSaleQty();
 
                     if($isStockManaged) {
 
@@ -368,6 +366,10 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
 
                         }
 
+                    }
+
+                    if ($maxSaleQty < $requestedQuantity) {
+                        $actualQuantity = $maxSaleQty;
                     }
 
             } else {
@@ -464,7 +466,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
 
     }
 
-    private function _reportErrorForProduct($product_hash,$errorCode,$errorMessage,$notAdded = true) {
+    protected function _reportErrorForProduct($product_hash,$errorCode,$errorMessage,$notAdded = true) {
         $this->_errorCodes[$product_hash] = $errorCode;
         $this->_errorMessages[$product_hash] = $errorMessage;
 
@@ -473,7 +475,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         }
     }
 
-    private function _getErrorForProduct($product_hash) {
+    protected function _getErrorForProduct($product_hash) {
         $response = array();
         $response["errorCode"] = 0;
         $response["errorMessage"] = null;
@@ -489,9 +491,12 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         return $response;
     }
 
+    protected function _getProductIdsNotAdded() {
+        return $this->_productIdsNotAdded;
+    }
 
 
-    private function getProductInQuoteResponse($quoteItem = null) {
+    protected function _getProductInQuoteResponse($quoteItem = null) {
 
         $product = $quoteItem->getProduct();
         $parent_product_id = $this->_getQuoteItemParentProductId($quoteItem);
@@ -521,12 +526,13 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         
 
         $productInQuote["hash"] = $this->_getQuoteItemHash($quoteItem);
+        $productInQuote["userInfo"] = array();
 
         
         return $productInQuote;
     }
 
-    private function _getQuoteItemHash($quoteItem) {
+    protected function _getQuoteItemHash($quoteItem) {
         $product = $quoteItem->getProduct();
 
         $hash = null;
@@ -595,14 +601,14 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
 
     }
 
-    private function _compareBundleSelection($a, $b) {
+    protected function _compareBundleSelection($a, $b) {
                if ($a["option_id"] == $b["option_id"]) {
                     return 0;
                 }
                 return ($a["option_id"] < $b["option_id"]) ? -1 : 1;
     }
 
-    private function _getQuoteItemRequestHash($quoteItemRequest) {
+    protected function _getQuoteItemRequestHash($quoteItemRequest) {
 
         $hash = null;
         $type = 'simple';
@@ -655,7 +661,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
 
     }
 
-    private function _getQuoteItemParentProductId($quoteItem) {
+    protected function _getQuoteItemParentProductId($quoteItem) {
         $additionalInfo = $quoteItem->getAdditionalData();
         if($additionalInfo) {
             $json = json_decode($additionalInfo,true);
@@ -664,7 +670,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         return null;
     }
 
-    private function getQuoteTotals($quote) {
+    protected function _getQuoteTotals($quote) {
 
 
         $quote->save()->collectTotals(); //required to fetch the totals
@@ -695,13 +701,14 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         $responseTotals["grandtotal"] = $grandtotal;
         $responseTotals["discount"] = $discount;
         $responseTotals["tax"] = $tax;
+        $responseTotals["userInfo"] = array();
 
         return $responseTotals;
     }
 
     
 
-    private function getSelectedShippingMethod($quote) {
+    protected function _getSelectedShippingMethod($quote) {
         $quoteShippingAddress = $quote->getShippingAddress();
         $quoteShippingAddress->collectTotals(); //to make sure all available shipping methods are listed
 
@@ -716,7 +723,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         return $chosenShippingMethod;
     }
 
-    private function getShippingMethods($quote, $selectedShippingMethod) { 
+    protected function _getShippingMethods($quote, $selectedShippingMethod) { 
         $responseCarriers = array();
         
         $quoteShippingAddress = $quote->getShippingAddress();
@@ -751,7 +758,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         return $responseCarriers;
     }
 
-    private function loadProduct($productId = null) {
+    protected function _loadProduct($productId = null) {
         if(!$productId)
             return null;
 
@@ -764,7 +771,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
                 
     } 
 
-    private function _getParentProduct($product) {
+    protected function _getParentProduct($product) {
         $config = Mage::helper('highstreet_hsapi/config_api');
         if ($config->alwaysAddSimpleProductsToCart()) {
             return null;
@@ -785,7 +792,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
     /**
      * Convenience method, compares 2 formatted address arrays
      */
-    private function _billingAndShippingAddressesAreTheSame($billingAddressArray = array(), $shippingAddressArray = array()) {
+    protected function _billingAndShippingAddressesAreTheSame($billingAddressArray = array(), $shippingAddressArray = array()) {
         if (count($billingAddressArray) == 0 || count($shippingAddressArray) == 0) {
             return true;
         }

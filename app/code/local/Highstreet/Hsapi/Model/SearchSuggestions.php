@@ -4,7 +4,7 @@
  *
  * @package     Highstreet_Hsapi
  * @author      Tim Wachter (tim@touchwonders.com)
- * @copyright   Copyright (c) 2014 Touchwonders (http://www.touchwonders.com/)
+ * @copyright   Copyright (c) 2015 Touchwonders (http://www.touchwonders.com/)
  */
 class Highstreet_Hsapi_Model_SearchSuggestions extends Mage_Core_Model_Abstract
 {
@@ -25,12 +25,18 @@ class Highstreet_Hsapi_Model_SearchSuggestions extends Mage_Core_Model_Abstract
 
 		// Set limit
 		$limit = 10;
+		$maxLimit = 50;
 		if (!empty($paramLimit)) {
 			$limit = $paramLimit;
 		}
 
+		if ($limit > $maxLimit) { // Limit the limit otherwise attackers could abuse this API
+			$limit = $maxLimit;
+		}
+
 		// Limit data to search term
 		if (!empty($paramSearch)) {
+			$paramSearch = str_replace('%', '', $paramSearch);
 			$searchCollection->addFieldToFilter('query_text', array("like" => $paramSearch . "%"));
 		}
 

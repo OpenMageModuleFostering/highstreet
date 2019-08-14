@@ -14,6 +14,12 @@ if ($configHelper->nativeSmartbannerAppUrl() != "") {
 	$searchQuery = Mage::app()->getRequest()->getParam('q');
 	$deeplink .= $searchQuery ? "search/" . $searchQuery . "/" : "";
 
+	if ($deeplink === $configHelper->nativeSmartbannerAppUrl() . "://") {
+		$deeplink .= 'home/';
+	}
+
+	$deeplink = rtrim($deeplink, '/'); // Remove trailing slash. Note: This funciton removes *all* trailing slashes,not just one
+
 	if ($configHelper->shouldShowNativeSmartbanner()) {
 		$metaTag = '<meta name="apple-itunes-app" content="app-id=' . $configHelper->nativeSmartbannerAppId();
 		$metaTag .= ', app-argument=' . $deeplink;
@@ -22,7 +28,13 @@ if ($configHelper->nativeSmartbannerAppUrl() != "") {
 		echo $metaTag;
 	}
 
-	echo '<meta property="al:ios:app_name" content="' . $configHelper->nativeSmartbannerAppName() . '">';
-	echo '<meta property="al:ios:app_store_id" content="' . $configHelper->nativeSmartbannerAppId() . '">';
-	echo '<meta property="al:ios:url" content="' . $deeplink . '">';
+	echo '<meta property="al:ios:url" content="' . $deeplink . '"/>';
+
+	if ($configHelper->nativeSmartbannerAppName() != "") {
+		echo '<meta property="al:ios:app_name" content="' . $configHelper->nativeSmartbannerAppName() . '"/>';
+	}
+
+	if ($configHelper->nativeSmartbannerAppId() != "") {
+		echo '<meta property="al:ios:app_store_id" content="' . $configHelper->nativeSmartbannerAppId() . '"/>';
+	}
 }
