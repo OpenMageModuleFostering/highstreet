@@ -8,10 +8,9 @@
  */
 
 class Highstreet_Hsapi_Helper_Config_Api extends Mage_Core_Helper_Abstract {
-	const MIDDLEWARE_URL_SCHEME = "http://";
-    const MIDDLEWARE_URL_ENVIRONMENT_STAGING = "api-dev";
+	const MIDDLEWARE_URL_SCHEME = "https://";
+    const MIDDLEWARE_URL_HOST_PATH = "api.highstreetapp.com/";
     const MIDDLEWARE_URL_ENVIRONMENT_PRODUCTION = "api";
-    const MIDDLEWARE_URL_HOST_PATH = "highstreetapp.com/hs-api/1.4";
     const CHECKOUT_URL_FALLBACK = "checkout/cart";
 
     public function alwaysAddSimpleProductsToCart() {
@@ -25,7 +24,8 @@ class Highstreet_Hsapi_Helper_Config_Api extends Mage_Core_Helper_Abstract {
     }
 
     public function storeIdentifier() {
-        $store_id = Mage::getStoreConfig('highstreet_hsapi/api/store_id');
+        $realStoreId = Mage::helper('highstreet_hsapi/config_default')->getStoreId();
+        $store_id = Mage::getStoreConfig('highstreet_hsapi/api/store_id', $realStoreId);
         return ($store_id === NULL) ? "" : $store_id;
     }
 
@@ -64,22 +64,12 @@ class Highstreet_Hsapi_Helper_Config_Api extends Mage_Core_Helper_Abstract {
     }
 
     public function middlewareUrl() {
-        if ($this->storeIdentifier() == "") {
+        $hostAndUri = $this->middlewareHostAndUri();
+        if(!$hostAndUri) {
             return NULL;
         }
 
-        $url = self::MIDDLEWARE_URL_SCHEME . $this->storeIdentifier();
-
-        if ($this->environment() === 'staging') {
-            $url .= '.' . self::MIDDLEWARE_URL_ENVIRONMENT_STAGING;
-        } else {
-            $url .= '.' . self::MIDDLEWARE_URL_ENVIRONMENT_PRODUCTION;
-        }
-
-        $url .= '.' . self::MIDDLEWARE_URL_HOST_PATH;
-
-
-        return $url;
+        return self::MIDDLEWARE_URL_SCHEME . $hostAndUri;
     }
 
     public function shouldShowNativeSmartbanner() {
@@ -99,4 +89,26 @@ class Highstreet_Hsapi_Helper_Config_Api extends Mage_Core_Helper_Abstract {
         
         return ($data === NULL) ? array() : $data;
     }
+
+    public function storeOverride() {
+        return Mage::getStoreConfig('highstreet_hsapi/api/checkout_override_storeview');
+    }
+
+    public function middlewareHostAndUri() {
+        if ($this->storeIdentifier() == "") {
+            return NULL;
+        }
+
+        $url = $this->storeIdentifier();
+
+        if ($this->environment() === 'staging') {
+            $url .= '-staging';
+        }
+
+        $url .= '.' . self::MIDDLEWARE_URL_HOST_PATH;
+
+
+        return $url;
+    }
+
 }

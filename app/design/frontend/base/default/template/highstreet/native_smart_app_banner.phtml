@@ -11,7 +11,7 @@ if ($configHelper->nativeSmartbannerAppUrl() != "") {
 	$product = Mage::registry('current_product');
 	$deeplink .= $product ? "products/" . $product->getId() . "/" : "";
 
-	$searchQuery = Mage::app()->getRequest()->getParam('q');
+	$searchQuery = $this->escapeHtml(Mage::app()->getRequest()->getParam('q'));
 	$deeplink .= $searchQuery ? "search/" . $searchQuery . "/" : "";
 
 	if ($deeplink === $configHelper->nativeSmartbannerAppUrl() . "://") {

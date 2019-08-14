@@ -50,20 +50,23 @@ class Highstreet_Hsapi_Model_Attributes extends Mage_Core_Model_Abstract
      * @param null $code
      * @return bool
      */
-    public function getAttribute($code=null)
+    public function getAttribute($code=null,$includeOptions=true)
     {
         if(null != $code){
-            if (array_key_exists($code, $this->_cachedAttributes)) {
+            if (array_key_exists($code, $this->_cachedAttributes) && $includeOptions) {
                 return $this->_cachedAttributes[$code];
             } else {
-                $attribute = $this->_extractResponse($this->_getAttribute($code));
+                $attribute = $this->_extractResponse($this->_getAttribute($code), $includeOptions);
                 
                 $response = array();
                 if (array_key_exists('attributes', $attribute) && count($attribute['attributes']) > 0) {
                     $response = $attribute['attributes'][0];
                 } 
 
-                $this->_cachedAttributes[$code] = $response;
+                if ($includeOptions) {
+                    $this->_cachedAttributes[$code] = $response;
+                }
+
                 return $response;
             }
         }
@@ -107,9 +110,10 @@ class Highstreet_Hsapi_Model_Attributes extends Mage_Core_Model_Abstract
     /**
      * Extract the correct formatted array from the attribute data
      * @param $attributes
+     * @param $includeOptions
      * @return array|bool
      */
-    private function _extractResponse($attributes)
+    private function _extractResponse($attributes, $includeOptions=true)
     {
         
         if(!is_array($attributes)){
@@ -127,10 +131,12 @@ class Highstreet_Hsapi_Model_Attributes extends Mage_Core_Model_Abstract
             $result['type'] = $attribute['frontend_input'];
 
             //Get the optionValues for this attribute
-            $result['options'] = $this->_getAttributeOptionValues(
-                    $attribute['attribute_id'],
-                    $attribute['default_value']
-                );
+            if ($includeOptions) {
+                $result['options'] = $this->_getAttributeOptionValues(
+                        $attribute['attribute_id'],
+                        $attribute['default_value']
+                    );
+            }
 
             //we need to push to respond as a json array without index
             array_push($response['attributes'], $result);

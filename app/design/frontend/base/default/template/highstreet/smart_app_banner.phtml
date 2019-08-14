@@ -36,7 +36,7 @@ $content->category = $category ? $category->getId() : null;
 $product = Mage::registry('current_product');
 $content->product = $product ? $product->getId() : null;
 
-$content->query = Mage::app()->getRequest()->getParam('q', null);
+$content->query = $this->escapeHtml(Mage::app()->getRequest()->getParam('q'));
 
 $content->version = Mage::getConfig()->getModuleConfig('Highstreet_SmartAppBanner')->version;
 
@@ -54,22 +54,12 @@ if ( in_array($config->module, $module_blacklist)
 
 // Construct javascript url
 $configHelper = Mage::helper('highstreet_hsapi/config_api');
-$middleWareUrl = $configHelper->middlewareUrl();
-$base_url = $middleWareUrl . "/smartbanner";
-$key = md5('dY63*23xOi'. $configHelper->storeIdentifier());
-$params = base64_url_encode(encrypt(json_encode($config), $key));
+$middleWareUrl = '//' . $configHelper->middlewareHostAndUri();
+$base_url = $middleWareUrl . "smartbanner";
+$base_url = str_replace(Highstreet_Hsapi_Helper_Config_Api::MIDDLEWARE_URL_SCHEME, "//", $base_url); // Replace the scheme with '//' so that the browser always decides if this resource needs to be loaded over SSL or not
+$params = base64_url_encode(json_encode($config));
 
 $js_url = "${base_url}/${params}";
-
-/**
- * Returns an encrypted & utf8-encoded string
- */
-function encrypt($pure_string, $encryption_key) {
-    $iv_size = mcrypt_get_iv_size(MCRYPT_BLOWFISH, MCRYPT_MODE_ECB);
-    $iv = mcrypt_create_iv($iv_size, MCRYPT_RAND);
-    $encrypted_string = mcrypt_encrypt(MCRYPT_BLOWFISH, $encryption_key, utf8_encode($pure_string), MCRYPT_MODE_ECB, $iv);
-    return trim($encrypted_string);
-}
 
 /**
  * Returns base64 url-safe encoded string

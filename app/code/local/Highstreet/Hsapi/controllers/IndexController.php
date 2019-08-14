@@ -104,6 +104,7 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
                                             "magento_version" => (string)Mage::getVersion(),
                                             "environment" => $configApi->environment(),
                                             "storefront" => Mage::app()->getStore()->getCode(),
+                                            "street_line_number" =>  Mage::getStoreConfig('customer/address/street_lines'),
                                             "attributes_sort_order_setting_raw" => $configApi->attributesSortOrderRaw()));
     }
 
@@ -301,8 +302,11 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
                                                     $requestObject->getParam('include_configuration_details'),
                                                     $requestObject->getParam('include_media_gallery'));
 
-        if ($products == null) {
+        if ($products == $model::PRODUCTS_ERROR_NOT_FOUND) {
             $this->_respondWith404();
+            return false;
+        } else if ($products == $model::PRODUCTS_ERROR_OUT_OF_RANGE) {
+            $this->_respondWith403();
             return false;
         }
 
@@ -321,6 +325,11 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
         $productObjects = array();
         if ($requestObject->getParam('ids') != "") {
             $idsArray = explode(',', $requestObject->getParam('ids'));
+            if (count($idsArray) >= Highstreet_Hsapi_Model_Products::RANGE_LIMIT) {
+                $this->_JSONencodeAndRespond(array());
+                return false;
+            }
+
 
             foreach ($idsArray as $value) {
                 $productObject = Mage::getModel('catalog/product')->load($value);
@@ -369,8 +378,8 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
                                                        $requestObject->getParam('include_configuration_details'),
                                                        $requestObject->getParam('include_media_gallery'));
 
-        if ($response == null) {
-            $this->_respondWith404();
+        if ($response == $productsModel::PRODUCTS_ERROR_OUT_OF_RANGE) {
+            $this->_respondWith403();
             return false;
         }
 
@@ -468,6 +477,13 @@ class Highstreet_Hsapi_IndexController extends Mage_Core_Controller_Front_Action
         return;
     }
     
+    protected function _respondWith403()
+    {
+        $this->getResponse()->setHeader('HTTP/1.1','403 Forbidden');
+        $this->getResponse()->sendHeaders();
+        return;
+    }
+
     protected function _respondWith404()
     {
         $this->getResponse()->setHeader('HTTP/1.1','404 Not Found');

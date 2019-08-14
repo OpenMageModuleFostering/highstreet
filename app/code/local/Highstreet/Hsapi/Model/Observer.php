@@ -2,7 +2,7 @@
 
 class Highstreet_Hsapi_Model_Observer {
    
-    private $_orderCommentTest = "Order made via the Highstreet app. Data identifier: ";
+    protected $_orderCommentTest = "Order made via the Highstreet app. Data identifier: ";
 
     /**
      * Listener for the sales_quote_merge_before event
@@ -48,15 +48,24 @@ class Highstreet_Hsapi_Model_Observer {
                 $order->addStatusHistoryComment($this->_orderCommentTest . Mage::getSingleton('checkout/session')->getHsTid())
                         ->setIsVisibleOnFront(false)
                         ->setIsCustomerNotified(false);
+
+                //Override the store (if filled in)
+                $configHelper = Mage::helper('highstreet_hsapi/config_api');
+                $storeId = $configHelper->storeOverride();
+                if($storeId && $storeId != -1) {
+                    $order->setStoreId($storeId);
+                }
                 $order->save();
             } catch (Exception $e) {}
+
+
         }
     }
 	
     /**
      * Private function used to communicate orders to the Highstreet middleware
      */
-	private function _communicateOrderEvent($order, $status = '') {	
+	protected function _communicateOrderEvent($order, $status = '') {	
         if ($order->getQuoteId() > 0) {
 
             // Check if this order identifies as a HS order trough the earlier added comment

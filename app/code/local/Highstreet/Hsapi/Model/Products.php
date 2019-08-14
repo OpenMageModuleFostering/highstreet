@@ -11,8 +11,12 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
     const MEDIA_PATH = '/media/';
     const PRODUCTS_MEDIA_PATH = '/media/catalog/product';
     const NO_IMAGE_PATH = 'no_selection';
-    const RANGE_FALLBACK_RANGE = 100;
+    const RANGE_FALLBACK_RANGE = 20;
+    const RANGE_LIMIT = 100;
     const SPECIAL_PRICE_FROM_DATE_FALLBACK = "1970-01-01 00:00:00";
+
+    const PRODUCTS_ERROR_NOT_FOUND = 404;
+    const PRODUCTS_ERROR_OUT_OF_RANGE = 403;
 
     protected $_attributesModel = null;
 
@@ -137,16 +141,18 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
                 $collection = $catalogSearchModelCollection;
         } else {
-
             // initialize
             $collection = Mage::getModel('catalog/product')->getCollection();
-            $collection->addStoreFilter();
-            Mage::getSingleton('catalog/product_status')->addVisibleFilterToCollection($collection);
-            Mage::getSingleton('catalog/product_visibility')->addVisibleInCatalogFilterToCollection($collection);
-
         }
 
 
+        $collection->addStoreFilter()
+                   ->addMinimalPrice()
+                   ->addFinalPrice()
+                   ->addTaxPercents()
+                   ->distinct(true);
+        Mage::getSingleton('catalog/product_status')->addVisibleFilterToCollection($collection);
+        Mage::getSingleton('catalog/product_visibility')->addVisibleInCatalogFilterToCollection($collection);
 
         
         $categoryNotSet = false;
@@ -158,7 +164,7 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         
         $category = Mage::getModel('catalog/category')->load($categoryId);
         if ($category->getId() === NULL) {
-            return array();
+            return self::PRODUCTS_ERROR_NOT_FOUND;
         }
 
         // apply search
@@ -172,6 +178,10 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
         if (!is_array($range)) {
             $range = array(0, self::RANGE_FALLBACK_RANGE);
+        }
+
+        if ($range[1] > self::RANGE_LIMIT) {
+            return self::PRODUCTS_ERROR_OUT_OF_RANGE;
         }
 
         $collection->getSelect()->limit($range[1], $range[0]);
@@ -193,39 +203,12 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
         
         //apply filters
         if(!empty($filters)) {
-            foreach ($filters as $filter) {
-                if (array_key_exists('attribute', $filter)) {
-                    foreach ($filter as $operator => $condition) {
-                        if ($operator != 'attribute') {
-                            $collection->addAttributeToFilter(array(array('attribute' => $filter['attribute'], $operator => $condition)));
-                        }
-                    }
-                }
-            }
+            $collection = $this->_filterProductsCollection($collection, $filters);
         }
 
         // Add 'out of stock' filter, if preffered 
         if (!Mage::getStoreConfig('cataloginventory/options/show_out_of_stock')) {
             Mage::getSingleton('cataloginventory/stock')->addInStockFilterToCollection($collection);
-
-            // Make a better fix for this. At this time this seems impossible, this doesn't work: 
-            // $collection->addAttributeToFilter('is_salable', array('eq' => 1));
-            // Mage::getSingleton('cataloginventory/stock')->addInStockFilterToCollection($collection); // Another popular suggestion around the web, crashes the app for now and 'under water' does the same as l:276
-            // For now we look trough all the configurable products in the collection of a certain category and filter out the unneded products
-            $collectionConfigurable = Mage::getResourceModel('catalog/product_collection')->addAttributeToFilter('type_id', array('eq' => 'configurable'));
-            $collectionConfigurable->addCategoryFilter($category);
-
-            $outOfStockConfis = array();
-            foreach ($collectionConfigurable as $_configurableproduct) {
-                $product = Mage::getModel('catalog/product')->load($_configurableproduct->getId());
-                if (!$product->getData('is_salable')) {
-                   $outOfStockConfis[] = $product->getId();
-                }
-            }
-            
-            if (count($outOfStockConfis) > 0) {
-                $collection->addAttributeToFilter('entity_id', array('nin' => $outOfStockConfis));
-            }
         }
         
         // Apply type filter, we only want Simple and Configurable and Bundle products in our API
@@ -241,7 +224,7 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
          * Format result array
          */
         $products = array('products' => array());
-
+        
         // If range requests no products to be returned, return no products. The limit() doesn't take 0 for an answer
         if ($range[1] > 0) {
             if (!$hideAttributes) {
@@ -317,6 +300,10 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
         if (!is_array($range)) {
             $range = array(0, self::RANGE_FALLBACK_RANGE);
+        }
+
+        if ($range[1] > self::RANGE_LIMIT) {
+            return self::PRODUCTS_ERROR_OUT_OF_RANGE;
         }
 
         $collection->getSelect()->limit($range[1], $range[0]);
@@ -543,11 +530,8 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
             $result = $controller->createBlock($filterBlockName)->setLayer($layer)->setAttributeModel($attribute)->init();
             $options = array();
             foreach($result->getItems() as $option) {
-                $title = str_replace('<span class="price">', "", $option->getLabel());
-                $title = str_replace('</span>', "", $title);
-
-                $count = $option->getData('count');
-                array_push($options, array('value' => $option->getValue(), 'title' => $title, 'product_count' => $count));
+                
+                array_push($options, $this->getFilterOptionValue($option));
             }
 
             if (count($options) > 1) {
@@ -570,6 +554,27 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
      * PRIVATE/protected FUNCTIONS
      */
     /***********************************/
+
+    /**
+     * Returns a formatted object for a given option item
+     * Made for subclassing
+     *
+     * @param $optionItem
+     * @return array
+     *
+     */
+    protected function getFilterOptionValue($optionItem = null) {
+        if (!$optionItem) {
+            return;
+        }
+
+        $title = str_replace('<span class="price">', "", $optionItem->getLabel());
+        $title = str_replace('</span>', "", $title);
+
+        $count = $optionItem->getData('count');
+
+        return array('value' => $optionItem->getValue(), 'title' => $title, 'product_count' => $count);
+    }
 
     /**
      * Gets count for given collection. Function made for easier subclassing
@@ -644,6 +649,76 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
             }
 
             $collection->setOrder($sortKey, $sortOrder);
+        }
+
+        return $collection;
+    }
+
+    /**
+     * Joins tables for attributes and adds given filters 
+     * Inspired by the applyFilterToCollection function by the class Mage_Catalog_Model_Resource_Layer_Filter_Attribute
+     *
+     * @param mixed Collection
+     * @param array filters
+     * @return mixed Collection
+     *
+     */
+    protected function _filterProductsCollection ($collection = null, $filters = array()) {
+        if ($collection === null || count($filters) <= 0) {
+            return $collection;
+        }
+
+        foreach ($filters as $filter) {
+            if (array_key_exists('attribute', $filter)) {
+
+                if ($filter['attribute'] === 'price') {
+                    foreach ($filter as $operator => $value) {
+                        if ($operator != 'attribute') {
+                            $collection->addAttributeToFilter(array(array('attribute' => $filter['attribute'], $operator => $value)));
+                        }
+                    }
+                } else {
+                    $attributeObject = $this->_attributesModel->getAttribute($filter['attribute'], false);
+                    $resource = Mage::getSingleton('core/resource');
+                    $connection = $resource->getConnection('default_read');
+                    $tableAlias = $filter['attribute'] . '_idx';
+                    $conditions = array(
+                        "{$tableAlias}.entity_id = e.entity_id",
+                        $connection->quoteInto("{$tableAlias}.attribute_id = ?", $attributeObject['id']),
+                        $connection->quoteInto("{$tableAlias}.store_id = ?", $collection->getStoreId())
+                    );
+
+                    foreach ($filter as $operator => $filterValue) {
+                        if ($operator != 'attribute') {
+                            if (is_array($filterValue)) {
+                                
+                                $whereString = "(";
+                                $i = 0;
+                                foreach ($filterValue as $value) {
+                                    if ($i >= count($filterValue)-1) {
+                                        $whereString .= $connection->quoteInto("{$tableAlias}.value = ?", $value);
+                                    } else {
+                                        $whereString .= $connection->quoteInto("{$tableAlias}.value = ?", $value) . ' OR ';
+                                    }
+                                    $i++;
+                                }
+                                $whereString .= ")";
+
+                                array_push($conditions, $whereString);
+                                
+                            } else {
+                                array_push($conditions, $connection->quoteInto("{$tableAlias}.value = ?", $filterValue));
+                            }
+                        }
+                    }
+
+                    $collection->getSelect()->join(
+                        array($tableAlias => $resource->getTableName('catalog/product_index_eav')),
+                        implode(' AND ', $conditions),
+                        array()
+                    );
+                }
+            }
         }
 
         return $collection;
@@ -872,11 +947,17 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
                 // SEE: Mage_Catalog_Block_Product_View_Attributes
                 $controller = Mage::app()->getLayout();
-                $block = $controller->createBlock('Mage_Catalog_Block_Product_View_Attributes');
+                $block = $controller->createBlock('catalog/product_view_attributes');
 
                 // Same function as used by the layouting
-                foreach ($block->getAdditionalData() as $attribute) {
-                    $html .=  "<p><strong>".$attribute['label'].":</strong></br>".$attribute['value']."</p>";
+                foreach ($block->getAdditionalData() as $attributeData) {
+
+                    if ($attributeData['value'] === Mage::helper('catalog')->__('No') || $attributeData['value'] === Mage::helper('catalog')->__('N/A')) {
+                        continue;
+                    }
+
+
+                    $html .=  "<p><strong>".$attributeData['label'].":</strong></br>".$attributeData['value']."</p>";
                 }
 
                 $additionalAttributeData['inline_value'] = $html;
@@ -884,6 +965,17 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
                 // Take responsibility to unregister the product 
                 Mage::unregister('product');
+
+                continue;
+            }
+
+            if ($attribute === "tax_price") {
+                $additionalAttributeData = array();
+                $additionalAttributeData['title'] = "Price with tax";
+                $additionalAttributeData['code'] = "tax_price";
+                $additionalAttributeData['type'] = "number";
+                $additionalAttributeData['inline_value'] = Mage::helper('tax')->getPrice($resProduct, $resProduct->getFinalPrice(), true);
+                $response[] = $additionalAttributeData;
 
                 continue;
             }
@@ -1078,9 +1170,11 @@ class Highstreet_Hsapi_Model_Products extends Mage_Core_Model_Abstract
 
         $output = array();
 
-        foreach (Mage::getModel('catalog/product')->load($productId)->getMediaGalleryImages()->getItems() as $key => $value) {
+        $resProduct = Mage::getModel('catalog/product')->load($productId);
+        foreach ($resProduct->getMediaGalleryImages()->getItems() as $key => $value) {
             $imageData = $value->getData();
 
+$resProduct = false;
             if ($this->_shouldExcludeImageFromMediaGallery($imageData["file"], $resProduct)) {
                 continue;
             }

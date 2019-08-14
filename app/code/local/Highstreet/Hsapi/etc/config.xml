@@ -1,17 +1,17 @@
 <?xml version="1.0"?>
 <!--
 /**
- * Highstreet_HSAPI_module
- *
- * @package     Highstreet_Hsapi
- * @author      Tim Wachter (tim@touchwonders.com) ~ Touchwonders
- * @copyright   Copyright (c) 2015 Touchwonders b.v. (http://www.touchwonders.com/)
- */
- -->
+* Highstreet_HSAPI_module
+*
+* @package     Highstreet_Hsapi
+* @author      Tim Wachter (tim@touchwonders.com) ~ Touchwonders
+* @copyright   Copyright (c) 2015 Touchwonders b.v. (http://www.touchwonders.com/)
+*/
+-->
 <config>
     <modules>
         <Highstreet_Hsapi>
-            <version>1.5.0</version>
+            <version>1.7.0</version>
         </Highstreet_Hsapi>
     </modules>
     <frontend>
@@ -30,6 +30,11 @@
             <highstreet_hsapi>
                 <class>Highstreet_Hsapi_Model</class>
             </highstreet_hsapi>
+            <core>
+                <rewrite>
+                    <session>Highstreet_Hsapi_Model_Session</session>
+                </rewrite>
+            </core>
         </models>
         <helpers>
             <highstreet_hsapi>
@@ -48,8 +53,8 @@
                 </setup>
             </highstreet_hsapi_setup>
         </resources>
-        <events> 
-           <sales_quote_merge_before>
+        <events>
+            <sales_quote_merge_before>
                 <observers>
                     <highstreet_hsapi_merge_quote>
                         <type>singleton</type>
@@ -57,8 +62,8 @@
                         <method>mergeQuote</method>
                     </highstreet_hsapi_merge_quote>
                 </observers>
-           </sales_quote_merge_before>           
-	       <sales_order_place_after>
+            </sales_quote_merge_before>           
+            <sales_order_place_after>
                 <observers>
                     <highstreet_hsapi_sales_order_place_after>
                         <class>Highstreet_Hsapi_Model_Observer</class>
@@ -77,12 +82,47 @@
             <sales_order_invoice_cancel>
                 <observers>
                     <highstreet_hsapi_sales_order_invoice_cancel>
-                    	<class>Highstreet_Hsapi_Model_Observer</class>
-                    	<method>salesOrderInvoiceCancel</method>
+                        <class>Highstreet_Hsapi_Model_Observer</class>
+                        <method>salesOrderInvoiceCancel</method>
                     </highstreet_hsapi_sales_order_invoice_cancel>
                 </observers>
             </sales_order_invoice_cancel>
-    	</events>
+            <!-- eTag update to quote and session object -->
+            <checkout_cart_product_add_after>
+                <observers>
+                    <highstreet_hsapi_cart_etag_update>
+                        <type>singleton</type>
+                        <class>Highstreet_Hsapi_Model_CartObserver</class>
+                        <method>cartEtagUpdate</method>
+                    </highstreet_hsapi_cart_etag_update>
+                </observers>
+            </checkout_cart_product_add_after>
+            <sales_quote_remove_item>
+                <observers>
+                    <highstreet_hsapi_cart_etag_update_remove>
+                        <type>singleton</type>
+                        <class>Highstreet_Hsapi_Model_CartObserver</class>
+                        <method>cartEtagUpdate</method>
+                    </highstreet_hsapi_cart_etag_update_remove>
+                </observers>
+            </sales_quote_remove_item>
+            <checkout_cart_update_items_after>
+                <observers>
+                    <highstreet_hsapi_cart_etag_update_update>
+                        <type>singleton</type>
+                        <class>Highstreet_Hsapi_Model_CartObserver</class>
+                        <method>cartEtagUpdate</method>
+                    </highstreet_hsapi_cart_etag_update_update>
+                </observers>
+            </checkout_cart_update_items_after>
+        </events>
+        <default>
+            <highstreet_hsapi>
+                <api>
+                    <checkout_override_storeview><![CDATA[-1]]></checkout_override_storeview>
+                </api>
+            </highstreet_hsapi>
+        </default>
     </global>
     <adminhtml>
         <acl>

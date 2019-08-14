@@ -151,9 +151,18 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
             if (isset($data['use_for_shipping']) && $data['use_for_shipping'] == 1) {
                 $result['goto_section'] = 'shipping_method';
 
+                $shippingMethods = $this->_getShippingMethods();
+
+                Mage::dispatchEvent(
+                        'highstreet_hsapi_checkout_shipping_methods_after', 
+                        array(
+                            'shipping_methods' => &$shippingMethods, 
+                            'quote' => $this->getOnepage()->getQuote(),
+                            'request' => $this->getRequest()));
+
                 $result['update_section'] = array(
                     'name' => 'shipping-method',
-                    'data' => $this->_getShippingMethods()
+                    'data' => $shippingMethods
                 );
 
                 $result['allow_sections'] = array('shipping');
@@ -180,11 +189,20 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
         
         $result = $this->getOnepage()->saveShipping($data, $customerAddressId);
 
+        $shippingMethods = $this->_getShippingMethods();
+
+        Mage::dispatchEvent(
+                'highstreet_hsapi_checkout_shipping_methods_after', 
+                array(
+                    'shipping_methods' => &$shippingMethods, 
+                    'quote' => $this->getOnepage()->getQuote(),
+                    'request' => $this->getRequest()));
+
         if (!isset($result['error'])) {
             $result['goto_section'] = 'shipping_method';
             $result['update_section'] = array(
                 'name' => 'shipping-method',
-                'data' => $this->_getShippingMethods()
+                'data' => $shippingMethods
             );
         }
         $this->_JSONencodeAndRespond($result);
@@ -207,13 +225,20 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
             $this->getOnepage()->getQuote()->collectTotals();
             $this->getResponse()->setBody(Mage::helper('core')->jsonEncode($result));
 
-            $paymentMethods = array();
-
-
             $result['goto_section'] = 'payment';
+
+            $paymentMethods = $this->_getPaymentMethods();
+
+            Mage::dispatchEvent(
+                'highstreet_hsapi_checkout_payment_methods_after', 
+                array(
+                    'payment_methods' => &$paymentMethods, 
+                    'quote' => $this->getOnepage()->getQuote(),
+                    'request' => $this->getRequest()));
+
             $result['update_section'] = array(
                 'name' => 'payment-method',
-                'data' => $this->_getPaymentMethods()
+                'data' => $paymentMethods
             );
         }
         $this->getOnepage()->getQuote()->collectTotals()->save();
@@ -401,7 +426,7 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
         return Mage::getSingleton('checkout/type_onepage');
     }
 
-    private function _getShippingMethods() {
+    protected function _getShippingMethods() {
         $shippingMethods = array();
 
         $shouldGetPostNL = true;
@@ -412,10 +437,18 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
 
             $cif = Mage::getModel('postnl_deliveryoptions/cif');
             if ($cif) {
+                
+                preg_match('([0-9]+)', $shippingAddressData["street"], $matches);
+                $housenumber = 1; //default to 1.
+                if(isset($matches) && count($matches) > 0) {
+                    $housenumber = $matches[0];
+                }
+
+
                 $postNlOptions = $cif->setStoreId(Mage::app()->getStore()->getId())
                                 ->getDeliveryTimeframes(array(
                                     'postcode'     => str_replace(" ", "", $shippingAddressData["postcode"]), // Postcode
-                                    'housenumber'  => ereg_replace("[^0-9]", "", $shippingAddressData["street"]), // Extract housenumber from street field
+                                    'housenumber'  => $housenumber,
                                     'deliveryDate' => date('d-m-Y', strtotime('+ 1 day')), // Set delivery day to tomorrow
                                 ));
             } else {
@@ -447,6 +480,7 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
                 $shippingMethod['price'] = $_rate->getData('price');
                 $shippingMethod['code'] = $_rate->getCode();
                 $shippingMethod['checked'] = $checked;
+                $shippingMethod['custom_fields'] = array();
 
                 if (strstr($_rate->getCode(), "postnl") !== false) {
                     $shippingMethod['sub_options'] = $postNlOptions;
@@ -460,7 +494,7 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
         return $shippingMethods;
     }
 
-    private function _getPaymentMethods() {
+    protected function _getPaymentMethods() {
         $paymentMethods = array();
 
         $model = new Mage_Checkout_Block_Onepage_Payment_Methods();
@@ -491,6 +525,7 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
             $object["checked"] = $checked;
 
             $object["sub_options"] = $this->_getSuboptionsForPaymentMethod($method);
+            $object["custom_fields"] = array();
 
             $paymentMethods[] = $object;
         }
@@ -624,7 +659,7 @@ class Highstreet_Hsapi_CheckoutController extends Mage_Core_Controller_Front_Act
     protected function _JSONencodeAndRespond($data, $numericCheck = true) {
         //set response body
         $this->_setHeader();
-        if ($numeric_check === FALSE || version_compare(PHP_VERSION, '5.3.3', '<')) {
+        if ($numericCheck === FALSE || version_compare(PHP_VERSION, '5.3.3', '<')) {
             $this->getResponse()->setBody(json_encode($data));
         } else {
             $this->getResponse()->setBody(json_encode($data, JSON_NUMERIC_CHECK));

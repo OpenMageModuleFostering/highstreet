@@ -19,6 +19,14 @@
                     <show_in_website>1</show_in_website>
                     <show_in_store>1</show_in_store>
                     <fields>
+                        <heading_general>
+                            <label><![CDATA[General Configuration]]></label>
+                            <frontend_model>adminhtml/system_config_form_field_heading</frontend_model>
+                            <sort_order>1</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                        </heading_general>
                         <store_id>
                             <label>Store identifier</label>
                             <comment>Your store identifier, e.g. your brand name</comment>
@@ -114,6 +122,15 @@
                             <show_in_website>1</show_in_website>
                             <show_in_store>1</show_in_store>
                         </checkout_redirect_url>
+                        <checkout_override_storeview translate="label">
+                            <label>The store view in which the orders should be saved</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>highstreet_hsapi/system_config_stores</source_model>
+                            <sort_order>92</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                        </checkout_override_storeview>
                         <attribute_sort_order translate="label">
                             <label>Adjust the product sort order</label>
                             <comment>JSON encoded string, formatted as {"attribute_name":"sortorder",...}</comment>
@@ -123,8 +140,65 @@
                             <show_in_website>1</show_in_website>
                             <show_in_store>1</show_in_store>
                         </attribute_sort_order>
+                        <heading_account>
+                            <label><![CDATA[New Account Configuration]]></label>
+                            <frontend_model>adminhtml/system_config_form_field_heading</frontend_model>
+                            <sort_order>110</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                        </heading_account>
+                        <new_account_email_enabled>
+                            <label>Send Custom New Account Email Template</label>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <sort_order>119</sort_order>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                        </new_account_email_enabled>
+                        <new_account_email_template>
+                            <label>New Account Email Template</label>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <sort_order>120</sort_order>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_email_template</source_model>
+                            <depends>
+                                <new_account_email_enabled>1</new_account_email_enabled>
+                            </depends>
+                        </new_account_email_template>
                     </fields>
                 </api>
+                <developer>
+                    <label>Developer</label>
+                    <frontend_type>text</frontend_type>
+                    <sort_order>50</sort_order>
+                    <show_in_default>1</show_in_default>
+                    <show_in_website>1</show_in_website>
+                    <show_in_store>1</show_in_store>
+                    <fields>
+                        <heading_general>
+                            <label><![CDATA[Developer Options]]></label>
+                            <frontend_model>adminhtml/system_config_form_field_heading</frontend_model>
+                            <sort_order>1</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                        </heading_general>
+                        <log_enabled translate="label">
+                            <label>Enable Logging</label>
+                            <comment>var/log/Highstreet_HSAPI.log</comment>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>30</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                        </log_enabled>
+                    </fields>
+                </developer>
             </groups>                
         </highstreet_hsapi>
     </sections>  

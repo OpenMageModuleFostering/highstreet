@@ -230,8 +230,8 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
         } else {
             $response["error"] = -1;
         }
-        
-        if ($billingAddressData["firstname"] !== null) {
+
+        if (isset($billingAddressData["firstname"]) && $billingAddressData["firstname"] !== null) {
             $billingAddressResponse = array();
 
             $billingAddressResponse["email"] = $billingAddressData["email"];
@@ -343,7 +343,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
                     $actualQuantity = $requestedQuantity; //actual qty is what we are going to add
 
                     //adjust actual quantity if we are requesting more than in stock
-                    $availableQuantity = $itemInventory->getQty();
+                    $availableQuantity = $itemInventory->getQty() - $itemInventory->getMinQty();
                     $isInStock = $itemInventory->getIsInStock();
                     $isStockManaged = $itemInventory->getManageStock();
                     $backordersAllowed = $itemInventory->getBackorders();
@@ -747,7 +747,7 @@ class Highstreet_Hsapi_Model_CheckoutV2 extends Mage_Core_Model_Abstract
                 $responseRate["carrierTitle"] = $rate->getCarrierTitle(); 
                 $responseRate["carrierCode"] = $rate->getCode(); 
             
-                $responseRate["method"] = $rate->getMethod();
+                $responseRate["method"] = $rate->getMethod() . " ";
                 $responseRate["methodTitle"] = $rate->getMethodTitle();
                 $responseRate["methodDescription"] = $rate->getMethodDescription();
                 $responseRate["price"] = $price;
