@@ -1,3 +1,5 @@
+
+
 ## Original Package Description
 
 Highstreet Magento Extension. This extension allows the Highstreet iPad and iPhone apps to connect to the store. 
