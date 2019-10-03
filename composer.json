@@ -1,16 +1,19 @@
 {
-    "name": "OpenMageModuleFostering/Highstreet",
+    "name": "OpenMageModuleFostering\/Highstreet",
     "type": "magento-module",
     "license": "-",
     "homepage": "",
     "description": "Highstreet Magento Extension. This extension allows the Highstreet iPad and iPhone apps to connect to the store. ",
     "authors": [
-    {
-        "name": "Highstreet",
-        "email": "support@highstreetapp.com"
-    }
-],
+        {
+            "name": "Highstreet",
+            "email": "support@highstreetapp.com"
+        }
+    ],
     "suggest": {
-        "magento-hackathon/magento-composer-installer": "*"
-    }
+        "magento-hackathon\/magento-composer-installer": "*"
+    },
+    "keywords": [
+        "openmage-module"
+    ]
 }
